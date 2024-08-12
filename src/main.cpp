@@ -1,88 +1,21 @@
 #include "path_planner.hpp"
+#include "visualizer.hpp"
+#include "utils.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
+extern "C" {
+    #include <dubins.h>
+}
+
 #include <memory>
 #include <chrono>
+#include <numbers>
+
+using namespace rota;
 
 
-template <typename T>
-void drawNodes(const Model& model, const T& nodes, std::size_t goal_node_index = 0) {
-
-    if (goal_node_index != 0) {
-        auto goal_node = nodes[goal_node_index];
-
-        while (goal_node.parent != 0) {
-            DrawModel(model, {goal_node.position.x, 0.0f, goal_node.position.y}, 3.0f, GREEN);
-
-            DrawLine3D(Vector3{goal_node.position.x, 0.0f, goal_node.position.y},
-                    Vector3{nodes[goal_node.parent].position.x, 0.0f, nodes[goal_node.parent].position.y},
-                    GREEN);
-
-            goal_node = nodes[goal_node.parent];
-        }
-    }
-
-    for (std::size_t i = 0; i < nodes.size(); ++i) {
-        const auto& node = nodes[i];
-        DrawModel(model, {node.position.x, 0.0f, node.position.y}, 0.2f, PURPLE);  
-
-        DrawLine3D(Vector3{node.position.x, 0.0f, node.position.y},
-                   Vector3{nodes[node.parent].position.x, 0.0f, nodes[node.parent].position.y},
-                   PURPLE);
-    }
-}
-
-Mesh GenMeshBorder(std::vector<Vector2> points) {
-    Mesh mesh{};
-
-    mesh.triangleCount = points.size() * 2;
-    mesh.vertexCount = mesh.triangleCount * 3;
-
-    mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-    mesh.normals  = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
-
-    for (std::size_t i = 0; i < points.size(); ++i) {
-        std::size_t next_idx = (i + 1) % points.size();
-
-        mesh.vertices[i * 18] = points[i].x;
-        mesh.vertices[i * 18 + 1] = 0.0f;
-        mesh.vertices[i * 18 + 2] = points[i].y;
-
-        mesh.vertices[i * 18 + 3] = points[i].x;
-        mesh.vertices[i * 18 + 4] = 5.0f;
-        mesh.vertices[i * 18 + 5] = points[i].y;
-
-        mesh.vertices[i * 18 + 6] = points[next_idx].x;
-        mesh.vertices[i * 18 + 7] = 5.0f;
-        mesh.vertices[i * 18 + 8] = points[next_idx].y;
-
-        mesh.vertices[i * 18 + 9] = points[next_idx].x;
-        mesh.vertices[i * 18 + 10] = 5.0f;
-        mesh.vertices[i * 18 + 11] = points[next_idx].y;
-
-        mesh.vertices[i * 18 + 12] = points[next_idx].x;
-        mesh.vertices[i * 18 + 13] = 0.0f;
-        mesh.vertices[i * 18 + 14] = points[next_idx].y;
-
-        mesh.vertices[i * 18 + 15] = points[i].x;
-        mesh.vertices[i * 18 + 16] = 0.0f;
-        mesh.vertices[i * 18 + 17] = points[i].y;
-    }
-
-    UploadMesh(&mesh, false);
-
-    return mesh;
-}
-
-Model GenModelBorder(std::vector<Vector2> points) {
-    Model border = LoadModelFromMesh(GenMeshBorder(points));
-    border.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = RED;
-
-    return border;
-}
-
-std::vector<path_planner::obstacle> GenObstacles(std::size_t num)
+std::vector<path_planner::obstacle> gen_obstacles(std::size_t num)
 {
     std::mt19937 gen(std::random_device{}());
     std::uniform_real_distribution<float> dis_uni(-38.0f, 38.0f);
@@ -92,19 +25,13 @@ std::vector<path_planner::obstacle> GenObstacles(std::size_t num)
     obstacles.reserve(num);
 
     for (std::size_t i = 0; i < num; ++i) {
-        Vector2 position{dis_uni(gen), dis_uni(gen)};
+        point position{dis_uni(gen), dis_uni(gen)};
         float radius = dis_nor(gen);
 
         obstacles.push_back(path_planner::obstacle{position, radius});
     }
 
     return obstacles;
-}
-
-void DrawObstacles(const std::vector<path_planner::obstacle>& obstacles) {
-    for (const auto& obstacle : obstacles) {
-        DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius - 2.0f, 5.0f, 16, RED);
-    }
 }
 
 int main() {
@@ -120,10 +47,10 @@ int main() {
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-    // DisableCursor();
+    DisableCursor();
     SetTargetFPS(60);
 
-    std::vector<Vector2> borderPoints {
+    std::vector<point> border_points {
         {-50.0f, -50.0f},
         {-25.0f, -30.0f},
         {50.0f, -50.0f},
@@ -131,31 +58,46 @@ int main() {
         {-50.0f, 50.0f},
     };
 
-    Model border = GenModelBorder(borderPoints);
-    Model modelNode = LoadModelFromMesh(GenMeshSphere(0.25f, 4, 8));
+    auto vis = visualizer(border_points);
 
     constexpr int NUM_OBSTACLES = 16;
-    auto obstacles = GenObstacles(NUM_OBSTACLES);
+    auto obstacles = gen_obstacles(NUM_OBSTACLES);
 
-    Vector2 startPos{-45.0f, -45.0f};
-    Vector2 goalPos{45.0f, 45.0f};
-    auto planner = std::make_unique<path_planner_rrt_star>(startPos, goalPos, 1.0f, 1.0f, borderPoints, obstacles);
+    point startPos{-45.0f, -45.0f};
+    point goalPos{45.0f, 45.0f};
+    auto planner = std::make_unique<path_planner_rrt_star>(startPos, goalPos, 1.0f, 1.0f, border_points, obstacles);
+    
+
+    DubinsPath path;
+    double q0[3] {0.0, 0.0, std::numbers::pi * 0.5};
+    double q1[3] {12.0, 6.0, std::numbers::pi * 1.0};
+    double rho = 4.0;
+    dubins_shortest_path(&path, q0, q1, rho);
+
+    double len = dubins_path_length(&path);
+    double interval = 1.0;
+    std::vector<point> path_points;
+    path_points.reserve(std::ceill(len / interval));
+
+    dubins_path_sample_many(&path, interval, [](double q[3], double t, void* user_data) {
+        auto vec = reinterpret_cast<std::vector<point>*>(user_data);
+        point p{static_cast<float>(q[0]), static_cast<float>(q[1])};
+        vec->push_back(p);
+        return 0;
+    }, &path_points);
 
     while (!WindowShouldClose())
     {
         UpdateCamera(&camera, CAMERA_THIRD_PERSON);
 
         if (IsKeyPressed(KEY_SPACE)) {
-            obstacles = GenObstacles(NUM_OBSTACLES);
-            planner = std::make_unique<path_planner_rrt_star>(startPos, goalPos, 1.0f, 1.0f, borderPoints, obstacles);
+            obstacles = gen_obstacles(NUM_OBSTACLES);
+            planner = std::make_unique<path_planner_rrt_star>(startPos, goalPos, 1.0f, 1.0f, border_points, obstacles);
         }
         
         if (IsKeyPressed(KEY_ENTER)) {
-            const auto start = std::chrono::high_resolution_clock::now();
+            timer t("RRT*");
             planner->step(20000);
-            const auto diff = std::chrono::high_resolution_clock::now() - start;
-            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-            std::cout << "Time taken: " << ms << "ms" << std::endl;
         }
 
         BeginDrawing();
@@ -164,14 +106,10 @@ int main() {
 
             BeginMode3D(camera);
 
-                rlDisableBackfaceCulling();
-                DrawModel(border, {0.0f, 0.0f, 0.0f}, 1.0f, WHITE);
-                rlEnableBackfaceCulling();
-
-                DrawObstacles(obstacles);
-
-                rlSetLineWidth(4.0f);
-                drawNodes(modelNode, planner->getNodes(), planner->get_goal_node_index());
+                // vis.draw_border();
+                // vis.draw_obstacles(obstacles);
+                // vis.draw_nodes(planner->get_nodes(), planner->get_goal_node());
+                vis.draw_path(path_points);
 
                 DrawGrid(25, 2.0f);
 

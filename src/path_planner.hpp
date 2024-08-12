@@ -1,29 +1,33 @@
 #pragma once
 
-#include <raylib.h>
-#include <raymath.h>
+#include "grid.hpp"
+#include "math.hpp"
 
-#include <vector>
 #include <random>
-#include <iostream>
-#include <memory>
 
+namespace rota {
 
 class path_planner {
 public:
     struct obstacle {
-        Vector2 position;
+        point position;
         float radius;
+    };
+
+    struct node {
+        point position;
+        const node* parent;
+        float cost;
     };
 
     path_planner() = delete;
 
     path_planner(
-        const Vector2& start,
-        const Vector2& goal,
+        const point& start,
+        const point& goal,
         const float step_size = 1.0f,
         const float goal_radius = 1.0f,
-        const std::vector<Vector2>& border = {},
+        const std::vector<point>& border = {},
         const std::vector<obstacle>& obstacles = {}
     ) :
         start(start),
@@ -35,47 +39,43 @@ public:
         gen(std::random_device{}()),
         goal_node_index(0)
     {
-        Vector2 min = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-        Vector2 max = {std::numeric_limits<float>::min(), std::numeric_limits<float>::min()};
+        border_min = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+        border_max = {std::numeric_limits<float>::min(), std::numeric_limits<float>::min()};
 
         for (const auto& point : border) {
-            if (point.x < min.x) min.x = point.x;
-            if (point.y < min.y) min.y = point.y;
-            if (point.x > max.x) max.x = point.x;
-            if (point.y > max.y) max.y = point.y;
+            if (point.x < border_min.x) border_min.x = point.x;
+            if (point.y < border_min.y) border_min.y = point.y;
+            if (point.x > border_max.x) border_max.x = point.x;
+            if (point.y > border_max.y) border_max.y = point.y;
         }
 
-        dis_uni_x = std::uniform_real_distribution<float>(min.x, max.x);
-        dis_uni_y = std::uniform_real_distribution<float>(min.y, max.y);
-    }
-
-    virtual void step(std::size_t num_steps = 1) = 0;
-
-    std::size_t get_goal_node_index() const {
-        return goal_node_index;
+        dis_uni_x = std::uniform_real_distribution<float>(border_min.x, border_max.x);
+        dis_uni_y = std::uniform_real_distribution<float>(border_min.y, border_max.y);
     }
 
 protected:
-    const Vector2 start;
-    const Vector2 goal;
+    const point start;
+    const point goal;
     float step_size;
     float goal_radius;
-    std::vector<Vector2> border;
+    std::vector<point> border;
     std::vector<obstacle> obstacles;
     std::mt19937 gen;
     std::size_t goal_node_index;
 
+    point border_min;
+    point border_max;
     std::uniform_real_distribution<float> dis_uni_x;
     std::uniform_real_distribution<float> dis_uni_y;
 
 
-    bool isColliding(const Vector2& point) {
-        bool collision = !CheckCollisionPointPoly(point, border.data(), border.size());
+    bool is_colliding(const point& point) {
+        bool collision = !check_collision(point, border);
         
         if (collision) return collision;
 
         for (const auto& obstacle : obstacles) {
-            if (Vector2DistanceSqr(point, obstacle.position) < (obstacle.radius * obstacle.radius)) {
+            if (distance_sqr(point, obstacle.position) < (obstacle.radius * obstacle.radius)) {
                 collision = true;
                 break;
             }
@@ -85,310 +85,152 @@ protected:
     }
 };
 
-
-
-class PathPlannerRRT : public path_planner {
-public:
-
-    struct node {
-        Vector2 position;
-        std::size_t parent;
-    };
-
-    PathPlannerRRT(
-        const Vector2& start,
-        const Vector2& goal,
-        const float step_size = 1.0f,
-        const float goal_radius = 1.0f,
-        const std::vector<Vector2>& border = {},
-        const std::vector<obstacle>& obstacles = {}
-    ) :
-        path_planner(start, goal, step_size, goal_radius, border, obstacles),
-        root{start, 0}
-    {
-        nodes.push_back(root);
-    }
-
-
-    void step(std::size_t num_steps = 1) override {
-        nodes.reserve(nodes.size() + num_steps);
-
-        for (std::size_t i = 0; i < num_steps;) {
-            Vector2 random_point{dis_uni_x(gen), dis_uni_y(gen)};
-            std::size_t index = nearestNodeIndex(random_point, nodes);
-            node nearest = nodes[index];
-            Vector2 direction = Vector2Normalize(Vector2Subtract(random_point, nearest.position));
-            Vector2 new_point = Vector2Add(nearest.position, Vector2Scale(direction, step_size));
-
-            if (isColliding(new_point))
-                continue;
-
-            if (Vector2DistanceSqr(new_point, goal) < (goal_radius * goal_radius)) {
-                goal_node_index = nodes.size();
-            }
-
-            node new_node;
-            new_node.parent = index;
-            new_node.position = new_point;
-
-            nodes.push_back(new_node);
-            ++i;
-        }
-    }
-
-    std::vector<node> getNodes() const {
-        return nodes;
-    }
-
-private:
-    node root;
-    std::vector<node> nodes;
-
-    std::size_t nearestNodeIndex(const Vector2& point, const std::vector<node>& nodes) {
-        std::size_t nearest = 0;
-        float min_distance = std::numeric_limits<float>::max();
-
-        for (std::size_t i = 0; i < nodes.size(); ++i) {
-            float distance = Vector2DistanceSqr(nodes[i].position, point);
-            if (distance < min_distance) {
-                nearest = i;
-                min_distance = distance;
-            }
-        }
-
-        return nearest;
-    }
-};
-
 class path_planner_rrt_star : public path_planner {
 public:
-    using index_t = std::uint32_t;
-
-    struct node {
-        Vector2 position;
-        index_t parent;
-        float cost;
-    };
-
-    class node_container_1 {
-    public:
-        using index_t = std::uint32_t;
-        using pos_t = Vector2;
-        using cost_t = float;
-
-        node_container_1() = delete;
-
-        node_container_1(std::size_t capacity) :
-            _size(0),
-            _capacity(capacity),
-            _nodes(std::make_unique<node[]>(_capacity))
-        {}
-
-        std::size_t size() const { return _size; }
-
-        pos_t& position(index_t index) { return _nodes[index].position; }
-        const pos_t& position(index_t index) const { return _nodes[index].position; }
-
-        index_t& parent(index_t index) { return _nodes[index].parent; }
-        const index_t& parent(index_t index) const { return _nodes[index].parent; }
-
-        cost_t& cost(index_t index) { return _nodes[index].cost; }
-        const cost_t& cost(index_t index) const { return _nodes[index].cost; }
-
-        void push_back(const pos_t& position, index_t parent, cost_t cost) {
-            _nodes[_size] = node{position, parent, cost};
-            ++_size;
-        }
-
-        void push_back(const node& n) {
-            push_back(n.position, n.parent, n.cost);
-        }
-
-        node operator[](index_t index) const {
-            return _nodes[index];
-        }
-
-        void clear() {
-            _size = 0;
-        }
-
-
-    private:
-        std::size_t _size;
-        std::size_t _capacity;
-
-        std::unique_ptr<node[]> _nodes;
-    };
-
-    class node_container_2 {
-    public:
-        using index_t = std::uint32_t;
-        using pos_t = Vector2;
-        using cost_t = float;
-
-        node_container_2() = delete;
-
-        node_container_2(std::size_t capacity) :
-            _size(0),
-            _capacity(capacity),
-            _positions(std::make_unique<pos_t[]>(_capacity)),
-            _parents(std::make_unique<index_t[]>(_capacity)),
-            _costs(std::make_unique<cost_t[]>(_capacity))
-        {}
-
-        std::size_t size() const { return _size; }
-
-        pos_t& position(index_t index) { return _positions[index]; }
-        const pos_t& position(index_t index) const { return _positions[index]; }
-
-        index_t& parent(index_t index) { return _parents[index]; }
-        const index_t& parent(index_t index) const { return _parents[index]; }
-
-        cost_t& cost(index_t index) { return _costs[index]; }
-        const cost_t& cost(index_t index) const { return _costs[index]; }
-
-        void push_back(const pos_t& position, index_t parent, cost_t cost) {
-            _positions[_size] = position;
-            _parents[_size] = parent;
-            _costs[_size] = cost;
-            ++_size;
-        }
-
-        void push_back(const node& n) {
-            push_back(n.position, n.parent, n.cost);
-        }
-
-        node operator[](index_t index) const {
-            return node{_positions[index], _parents[index], _costs[index]};
-        }
-
-        void clear() {
-            _size = 0;
-        }
-
-    private:
-        std::size_t _size;
-        std::size_t _capacity;
-
-        std::unique_ptr<pos_t[]> _positions;
-        std::unique_ptr<index_t[]> _parents;
-        std::unique_ptr<cost_t[]> _costs;
-    };
-
     path_planner_rrt_star(
-        const Vector2& start,
-        const Vector2& goal,
+        const point& start,
+        const point& goal,
         const float step_size = 2.0f,
         const float goal_radius = 1.0f,
-        const std::vector<Vector2>& border = {},
+        const std::vector<point>& border = {},
         const std::vector<obstacle>& obstacles = {},
         const float neighbour_radius = 4.0f
     ) :
         path_planner(start, goal, step_size, goal_radius, border, obstacles),
         neighbour_radius(neighbour_radius),
-        root{start, 0, 0.0f},
-        nodes(20001)
+        root{start, nullptr, 0.0f},
+        goal_node{},
+        nodes(border_min, border_max, neighbour_radius*2.0f, 512)
     {
-        nodes.push_back(root);
+        nodes.add_data(start, root);
     }
 
-    void step(std::size_t num_steps = 1) override {
+    void step(std::size_t num_steps = 1) {
         for (std::size_t i = 0; i < num_steps;) {
-            Vector2 random_point{dis_uni_x(gen), dis_uni_y(gen)};
-            Vector2 nearest_position = nearest_node_position(random_point);
+            point random_point{dis_uni_x(gen), dis_uni_y(gen)};
+            if (is_colliding(random_point)) { continue; }
+            point nearest_position = nearest_node_position(random_point);
+            point direction = normalize(subtract(random_point, nearest_position));
+            point new_point = add(nearest_position, scale(direction, step_size));
+            if (is_colliding(new_point)) { continue; }
 
-            Vector2 direction = Vector2Normalize(Vector2Subtract(random_point, nearest_position));
-            Vector2 new_point = Vector2Add(nearest_position, Vector2Scale(direction, step_size));
-
-            if (isColliding(new_point)) {
-                continue;
-            }
-            else {
-                ++i;
-            }
-
-            const auto neighbour_indices = find_neighbours(new_point);
-            const auto parent_index = find_best_parent(new_point, neighbour_indices);
-            const auto parent = nodes[parent_index];
+            const auto neighbours = find_neighbours(new_point);
+            const node* parent = find_best_parent(new_point, neighbours);
 
             node new_node;
-            new_node.parent = parent_index;
+            new_node.parent = parent;
             new_node.position = new_point;
-            new_node.cost = parent.cost + Vector2Distance(new_node.position, parent.position);
+            new_node.cost = cost(new_point, *parent);
+            const node* new_node_ptr = nodes.add_data(new_node.position, new_node);
+            ++i;
 
-            if (Vector2DistanceSqr(new_point, goal) < goal_radius * goal_radius) {
-                if (goal_node_index == 0 || new_node.cost < nodes.cost(goal_node_index)) {
-                    goal_node_index = nodes.size();
+            if (distance_sqr(new_point, goal) < goal_radius * goal_radius) {
+                if (goal_node.parent == nullptr || new_node.cost < goal_node.cost) {
+                    goal_node = new_node;
                 }
             }
 
-            for (const auto& neighbour_index : neighbour_indices) {
-                node neighbour = nodes[neighbour_index];
-                float new_cost = new_node.cost + Vector2Distance(new_node.position, neighbour.position);
+            for (const auto& neighbour : neighbours) {
+                float new_cost = cost(neighbour->position, new_node);
 
-                if (new_cost < neighbour.cost) {
-                    nodes.parent(neighbour_index) = nodes.size();
-                    nodes.cost(neighbour_index) = new_cost;
+                if (new_cost < neighbour->cost) {
+                    neighbour->parent = new_node_ptr;
+                    neighbour->cost = new_cost;
                 }
             }
-
-            nodes.push_back(new_node);
         }
     }
 
-    const node_container& getNodes() const {
-        return nodes;
+    static constexpr real_t cost(const point& p, const node& parent) {
+        return parent.cost + distance(p, parent.position);
+    }
+
+    const std::span<node> get_nodes() const {
+        return nodes.get_data();
+    }
+
+    const node& get_goal_node() const {
+        return goal_node;
     }
 
 private:
     float neighbour_radius;
     node root;
-    node_container nodes;
-
-    Vector2 nearest_node_position(const Vector2& point) const {
-        Vector2 pos{0.0f, 0.0f};
+    node goal_node;
+    grid_spatial<node> nodes;
+    
+    
+    point nearest_node_position(point p) const {
         float min_distance = std::numeric_limits<float>::max();
+        point nearest_pos;
 
-        for (std::size_t i = 0; i < nodes.size(); ++i) {
-            Vector2 n_pos = nodes.position(i);
-            float distance = Vector2DistanceSqr(n_pos, point);
-            if (distance < min_distance) {
-                pos = n_pos;
-                min_distance = distance;
+        int dist = 0;
+        const auto center = nodes.get_coord(p);
+        while (min_distance == std::numeric_limits<float>::max()) {
+            for (int y = -dist; y <= dist; ++y) {
+                for (int x = -dist; x <= dist; ++x) {
+                    if (x == -dist || x == dist || y == -dist || y == dist) {
+                        grid_spatial<node>::coord cell_coord{center.x + x, center.y + y};
+                        if (cell_coord.x < 0 || cell_coord.x >= nodes.get_width() || cell_coord.y < 0 || cell_coord.y >= nodes.get_height()) {
+                            continue;
+                        }
+                        auto cell = nodes.get_cell(cell_coord.x, cell_coord.y);
+                        for (int i = 0; i < *cell.size; ++i) {
+                            point pos = cell.data[i].position;
+                            float distance = distance_sqr(pos, p);
+                            if (distance < min_distance) {
+                                min_distance = distance;
+                                nearest_pos = pos;
+                            }
+                        }
+                    }
+                }
             }
+            ++dist;
         }
-
-        return pos;
+        return nearest_pos;
     }
 
-    std::vector<index_t> find_neighbours(const Vector2& point) const {
-        std::vector<index_t> neighbours;
+    std::vector<node*> find_neighbours(point p) const {
+        std::vector<node*> neighbours;
+        neighbours.reserve(nodes.get_capacity() * 9);
 
-        for (std::size_t i = 0; i < nodes.size(); ++i) {
-            float distance = Vector2DistanceSqr(nodes.position(i), point);
-            if (distance < neighbour_radius * neighbour_radius) {
-                neighbours.push_back(i);
+        const auto center = nodes.get_coord(p);
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                const grid_spatial<node>::coord cell_coord{center.x + x, center.y + y};
+                if (cell_coord.x < 0 || cell_coord.x >= nodes.get_width() || cell_coord.y < 0 || cell_coord.y >= nodes.get_height()) {
+                    continue;
+                }
+                auto cell = nodes.get_cell(center.x + x, center.y + y);
+
+                for (int i = 0; i < *cell.size; ++i) {
+                    point pos = cell.data[i].position;
+                    if (distance_sqr(pos, p) < neighbour_radius * neighbour_radius) {
+                        neighbours.push_back(cell.data + i);
+                    }
+                }
             }
         }
 
         return neighbours;
     }
 
-    index_t find_best_parent(const Vector2& point, const std::vector<index_t>& neighbour_indices) const {
-        index_t best_parent_index = 0;
+    node* find_best_parent(const point& point, const std::vector<node*>& neighbours) const {
+        node* best_parent;
         float min_cost = std::numeric_limits<float>::max();
 
-        for (const auto& neighbour_index : neighbour_indices) {
-            node neighbour = nodes[neighbour_index];
-            float distance = Vector2Distance(neighbour.position, point);
-            float cost = neighbour.cost + distance;
+        for (const auto& neighbour : neighbours) {
+            float dist = distance(neighbour->position, point);
+            float cost = neighbour->cost + dist;
 
             if (cost < min_cost) {
-                best_parent_index = neighbour_index;
+                best_parent = neighbour;
                 min_cost = cost;
             }
         }
 
-        return best_parent_index;
+        return best_parent;
     }
 };
+}

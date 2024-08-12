@@ -11,10 +11,15 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/raysan5/raylib.git
 )
 
-FetchContent_MakeAvailable(raylib)
+FetchContent_Declare(
+  dubins 
+  GIT_REPOSITORY https://github.com/AndrewWalker/Dubins-Curves.git
+)
+
+FetchContent_MakeAvailable(raylib dubins)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_NAME} raylib)
+target_link_libraries(${PROJECT_NAME} raylib dubins)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
 if (APPLE)
