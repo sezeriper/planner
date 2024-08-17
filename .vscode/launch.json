@@ -7,11 +7,32 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
+            "name": "debug",
+            "preLaunchTask": "build-debug",
             "program": "${workspaceFolder}/build/path_planner",
             "args": [],
             "cwd": "${workspaceFolder}",
-            "console": "internalConsole"
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "release",
+            "preLaunchTask": "build-release",
+            "program": "${workspaceFolder}/build/path_planner",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "relwithdeb",
+            "preLaunchTask": "build-relwithdeb",
+            "program": "${workspaceFolder}/build/path_planner",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         }
     ]
 }

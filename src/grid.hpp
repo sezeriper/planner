@@ -9,8 +9,6 @@ namespace rota {
 template <typename data_t>
 class grid {
 public:
-    using size_t = std::uint64_t;
-
     struct cell {
         data_t* data;
         size_t* size;
@@ -31,18 +29,13 @@ public:
         };
     }
 
-    data_t* add_data(size_t x, size_t y, const data_t& data) {
-
+    data_t& add_data(size_t x, size_t y, const data_t& data) {
         auto cell = get_cell(x, y);
 
-        // if (*cell.size < _capacity) {
-            cell.data[*cell.size] = data;
-            ++(*cell.size);
+        cell.data[*cell.size] = std::move(data);
+        ++(*cell.size);
 
-            return cell.data + *cell.size - 1;
-        // } else {
-        //     std::cerr << "Cell is full" << std::endl;
-        // }
+        return *(cell.data + *cell.size - 1);
     }
 
     size_t get_width() const {
@@ -74,6 +67,8 @@ template <typename data_t>
 class grid_spatial : public grid<data_t> {
 public:
     using typename grid<data_t>::cell;
+    using grid<data_t>::get_cell;
+    using grid<data_t>::add_data;
 
     struct coord {
         size_t x;
@@ -93,24 +88,33 @@ public:
         _cell_size(cell_size)
     {}
 
+    constexpr real_t get_cell_size() const {
+        return _cell_size;
+    }
+
+    constexpr point get_top_left() const {
+        return _top_left;
+    }
+
+    constexpr point get_bottom_right() const {
+        return _bottom_right;
+    }
+
     constexpr coord get_coord(point p) const {
         size_t x = static_cast<size_t>((p.x - _top_left.x) / _cell_size);
         size_t y = static_cast<size_t>((p.y - _top_left.y) / _cell_size);
         return {x, y};
     }
 
-    using grid<data_t>::get_cell;
     cell get_cell(point p) const {
         coord c = get_coord(p);
         return get_cell(c.x, c.y);
     }
 
-    using grid<data_t>::add_data;
-    const data_t* add_data(point p, const data_t& data) {
+    data_t& add_data(point p, const data_t& data) {
         coord c = get_coord(p);
         return add_data(c.x, c.y, data);
     }
-
 
 private:
     point _top_left;

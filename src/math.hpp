@@ -45,7 +45,7 @@ constexpr point scale(const point p, real_t s) {
 // Taken from raylib/src/rshapes.c
 // Check if point is within a polygon described by array of vertices
 // NOTE: Based on http://jeffreythompson.org/collision-detection/poly-point.php
-constexpr bool check_collision(const point p, const std::vector<point>& poly)
+constexpr bool is_inside(const point p, const std::vector<point>& poly)
 {
     bool inside = false;
 

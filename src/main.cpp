@@ -1,12 +1,13 @@
 #include "path_planner.hpp"
 #include "visualizer.hpp"
 #include "utils.hpp"
+#include "camera.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
-extern "C" {
-    #include <dubins.h>
-}
+#include <raymath.h>
+#include <imgui.h>
+#include <rlImGui.h>
 
 #include <memory>
 #include <chrono>
@@ -40,19 +41,12 @@ int main() {
 
     InitWindow(screenWidth, screenHeight, "RRT* Dubins Path Planning");
 
-    Camera camera{};
-    camera.position = Vector3{ 50.0f, 50.0f, 50.0f };
-    camera.target = Vector3{ 0.0f, 0.0f, 0.0f };
-    camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
-    camera.fovy = 45.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
-
-    DisableCursor();
     SetTargetFPS(60);
+
+    rlImGuiSetup(true);
 
     std::vector<point> border_points {
         {-50.0f, -50.0f},
-        {-25.0f, -30.0f},
         {50.0f, -50.0f},
         {50.0f, 50.0f},
         {-50.0f, 50.0f},
@@ -60,63 +54,90 @@ int main() {
 
     auto vis = visualizer(border_points);
 
-    constexpr int NUM_OBSTACLES = 16;
-    auto obstacles = gen_obstacles(NUM_OBSTACLES);
+    constexpr int NUM_OBSTACLES = 8;
+    // auto obstacles = gen_obstacles(NUM_OBSTACLES);
+    std::vector<path_planner::obstacle> obstacles {
+        {{-10.0f, -10.0f}, 10.0f},
+        {{-10.0f, 10.0f}, 10.0f},
+        {{10.0f, -10.0f}, 10.0f},
+        {{10.0f, 10.0f}, 10.0f},
+        {{-20.0f, -20.0f}, 10.0f},
+        {{-20.0f, 20.0f}, 10.0f},
+        {{20.0f, -20.0f}, 10.0f},
+        {{20.0f, 20.0f}, 10.0f},
+    };
 
-    point startPos{-45.0f, -45.0f};
-    point goalPos{45.0f, 45.0f};
-    auto planner = std::make_unique<path_planner_rrt_star>(startPos, goalPos, 1.0f, 1.0f, border_points, obstacles);
-    
+    configuration start{{-45.0f, -45.0f}, PI * 0.5f};
+    configuration goal{{40.0f, 40.0f}, 0.0f};
 
-    DubinsPath path;
-    double q0[3] {0.0, 0.0, std::numbers::pi * 0.5};
-    double q1[3] {12.0, 6.0, std::numbers::pi * 1.0};
-    double rho = 4.0;
-    dubins_shortest_path(&path, q0, q1, rho);
+    constexpr real_t RHO = 8.0f;
+    constexpr real_t STEP_SIZE = 4.0f;
+    constexpr real_t GOAL_RADIUS = STEP_SIZE;
+    constexpr real_t NB_RADIUS = 8.0f;
+    auto planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NB_RADIUS, RHO, border_points, obstacles);
 
-    double len = dubins_path_length(&path);
-    double interval = 1.0;
-    std::vector<point> path_points;
-    path_points.reserve(std::ceill(len / interval));
+    camera cam(Vector3{50.0f, 50.0f, 50.0f});
 
-    dubins_path_sample_many(&path, interval, [](double q[3], double t, void* user_data) {
-        auto vec = reinterpret_cast<std::vector<point>*>(user_data);
-        point p{static_cast<float>(q[0]), static_cast<float>(q[1])};
-        vec->push_back(p);
-        return 0;
-    }, &path_points);
-
+    int node_count = 100;
+    bool show_nodes = true;
+    bool do_sample = false;
+    bool do_reset = false;
     while (!WindowShouldClose())
     {
-        UpdateCamera(&camera, CAMERA_THIRD_PERSON);
-
-        if (IsKeyPressed(KEY_SPACE)) {
-            obstacles = gen_obstacles(NUM_OBSTACLES);
-            planner = std::make_unique<path_planner_rrt_star>(startPos, goalPos, 1.0f, 1.0f, border_points, obstacles);
-        }
+        cam.update();
         
-        if (IsKeyPressed(KEY_ENTER)) {
-            timer t("RRT*");
-            planner->step(20000);
+        BeginDrawing();
+        ClearBackground(DARKGRAY);
+
+        BeginMode3D(cam.get());
+
+        vis.draw_border();
+        vis.draw_obstacles(obstacles);
+        if (show_nodes) {
+            vis.draw_nodes(planner->get_nodes(), RHO);
+        }
+        else {
+            vis.draw_goal_path(planner->get_goal_node(), RHO);
+        }
+        vis.draw_grid(planner->get_grid());
+        // vis.draw_path(path_points);
+        vis.draw_configuration(start);
+        vis.draw_configuration(goal);
+
+        EndMode3D();
+
+        {
+            rlImGuiBegin();
+            ImGui::Begin("Menu");
+
+                ImGui::SliderInt("Node Count", &node_count, 1, 10000);
+                do_sample = ImGui::Button("Sample", ImVec2(100, 20));
+                do_reset = ImGui::Button("Reset", ImVec2(100, 20));
+                auto added_nodes = std::to_string(planner->get_node_count());
+                if (ImGui::Button("Toggle Nodes", ImVec2(100, 20))) {
+                    show_nodes = !show_nodes;
+                }
+                ImGui::Text(added_nodes.c_str());
+
+            ImGui::End();
+            rlImGuiEnd();
         }
 
-        BeginDrawing();
-
-            ClearBackground(RAYWHITE);
-
-            BeginMode3D(camera);
-
-                // vis.draw_border();
-                // vis.draw_obstacles(obstacles);
-                // vis.draw_nodes(planner->get_nodes(), planner->get_goal_node());
-                vis.draw_path(path_points);
-
-                DrawGrid(25, 2.0f);
-
-            EndMode3D();
         EndDrawing();
+
+        if (IsKeyPressed(KEY_SPACE) || do_reset) {
+            // obstacles = gen_obstacles(NUM_OBSTACLES);
+            planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NB_RADIUS, RHO, border_points, obstacles);
+        }
+
+        if (IsKeyPressed(KEY_ENTER) || do_sample) {
+            timer t("RRT*");
+            planner->step(node_count);
+        }
+
     }
 
+    rlImGuiShutdown();
     CloseWindow();
 
     return 0;
