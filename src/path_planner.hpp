@@ -39,7 +39,8 @@ static std::vector<configuration> sample_path_to_end(DubinsPath& path, real_t in
     std::vector<configuration> path_points;
 
     real_t q[3];
-    for (real_t t = 0.0;; t += interval) {
+    real_t length = dubins_path_length(&path);
+    for (real_t t = 0.0; t < length; t += interval) {
         int result = dubins_path_sample(&path, t, q);
         if (result != 0) break;
         path_points.push_back({{
@@ -60,6 +61,12 @@ static std::vector<configuration> sample_path_to_end(DubinsPath& path, real_t in
 static std::vector<configuration> sample_path_to_length(DubinsPath& path, real_t length, real_t interval = 0.1) {
     std::vector<configuration> path_points;
 
+    real_t path_length = dubins_path_length(&path);
+
+    if ((path_length - length) < EPSILON) {
+        return sample_path_to_end(path, interval);
+    }
+
     real_t q[3];
     for (real_t t = 0.0; t < length; t += interval) {
         int result = dubins_path_sample(&path, t, q);
@@ -70,17 +77,7 @@ static std::vector<configuration> sample_path_to_length(DubinsPath& path, real_t
         });
     }
 
-    real_t path_length = dubins_path_length(&path);
-    if (length < path_length) {
-        dubins_path_sample(&path, length, q);
-    }
-    else {
-        dubins_path_endpoint(&path, q);
-    }
-    path_points.push_back({{
-        static_cast<real_t>(q[0]), static_cast<real_t>(q[1])},
-        static_cast<real_t>(q[2])
-    });
+    dubins_path_sample(&path, length, q);
 
     return path_points;
 }
@@ -144,7 +141,7 @@ protected:
         return (get_rand_real() * (end - start)) + start;
     }
 
-    constexpr real_t get_rand_angle() { return get_rand_between(-std::numbers::pi_v<real_t>, std::numbers::pi_v<real_t>); }
+    constexpr real_t get_rand_angle() { return get_rand_between(0.0, std::numbers::pi_v<real_t> * 2.0); }
 
     constexpr point get_rand_point() {
         return {get_rand_between(border_min.x, border_max.x),
@@ -410,6 +407,7 @@ private:
 
         auto new_conf = path_points.back();
         const auto neighbours = find_neighbours(new_conf.pos);
+        if (is_colliding_with_neighbours(new_conf, neighbours)) return {};
 
         const auto result = find_best_parent(new_conf, neighbours);
 
@@ -419,8 +417,7 @@ private:
         if (parent == nullptr ||
             cost == std::numeric_limits<real_t>::infinity()) return {};
 
-        if (is_colliding_with_neighbours(new_conf, neighbours)) return {};
-        
+
         node_t& new_node = nodes.add_data(new_conf.pos, {
             parent,
             cost,
@@ -452,8 +449,13 @@ private:
             if (!path_opt) continue;
 
             DubinsPath path = path_opt.value();
-            real_t new_cost = new_n.cost + dubins_path_length(&path);
+
+            real_t path_length = dubins_path_length(&path);
+            if (path_length > step_size) continue;
+
+            real_t new_cost = new_n.cost + path_length;
             if (new_cost >= neighbour->cost) continue;
+
 
             const auto path_points = sample_path_to_end(path);
             if (is_colliding(path_points)) continue;
@@ -462,7 +464,6 @@ private:
 
             neighbour->parent = &new_n;
             neighbour->cost = new_cost;
-            neighbour->conf = path_points.back();
         }
     }
 

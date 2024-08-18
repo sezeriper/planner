@@ -25,6 +25,8 @@
 #include "../math.hpp"
 using namespace rota;
 
+#define EPSILON (10e-10)
+
 typedef enum 
 {
     LSL = 0,
@@ -167,7 +169,6 @@ int dubins_path_endpoint(DubinsPath* path, real_t q[3]);
  * @param newpath - the resultant path
  */
 int dubins_extract_subpath(DubinsPath* path, real_t t, DubinsPath* newpath);
-
 
 #endif /* DUBINS_H */
 
