@@ -6,8 +6,8 @@
 namespace rota {
 class camera {
 public:
-    camera(Vector3 position) :
-        cam{position,
+    camera() :
+        cam{{0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
             45.0f,

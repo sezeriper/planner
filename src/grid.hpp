@@ -14,7 +14,7 @@ public:
         size_t* size;
     };
 
-    grid(size_t width, size_t height, size_t capacity):
+    grid(int width, int height, int capacity):
         _width(width),
         _height(height),
         _capacity(capacity),
@@ -22,7 +22,7 @@ public:
         _size(std::make_unique<size_t[]>(width * height))
     {}
 
-    cell get_cell(size_t x, size_t y) const {
+    cell get_cell(int x, int y) const {
         return {
             &_data[(y * _width * _capacity) + (x * _capacity)],
             &_size[(y * _width) + x]
@@ -46,7 +46,7 @@ public:
         return _height;
     }
 
-    std::span<data_t> get_data() const {
+    const std::span<data_t> get_data() const {
         return {_data.get(), _width * _height * _capacity};
     }
 
@@ -66,10 +66,6 @@ private:
 template <typename data_t>
 class grid_spatial : public grid<data_t> {
 public:
-    using typename grid<data_t>::cell;
-    using grid<data_t>::get_cell;
-    using grid<data_t>::add_data;
-
     struct coord {
         size_t x;
         size_t y;
@@ -77,7 +73,7 @@ public:
 
     grid_spatial() = delete;
 
-    grid_spatial(point top_left, point bottom_right, real_t cell_size, size_t capacity) :
+    grid_spatial(point top_left, point bottom_right, real_t cell_size, int capacity) :
         grid<data_t>(
             ((bottom_right.x - top_left.x) / cell_size) + 1,
             ((bottom_right.y - top_left.y) / cell_size) + 1,
@@ -101,19 +97,43 @@ public:
     }
 
     constexpr coord get_coord(point p) const {
-        size_t x = static_cast<size_t>((p.x - _top_left.x) / _cell_size);
-        size_t y = static_cast<size_t>((p.y - _top_left.y) / _cell_size);
+        size_t x = (p.x - _top_left.x) / _cell_size;
+        size_t y = (p.y - _top_left.y) / _cell_size;
         return {x, y};
     }
 
-    cell get_cell(point p) const {
+    using grid<data_t>::get_cell;
+    grid<data_t>::cell get_cell(point p) const {
         coord c = get_coord(p);
-        return get_cell(c.x, c.y);
+        return grid<data_t>::get_cell(c.x, c.y);
     }
 
+    std::vector<typename grid<data_t>::cell> get_cells_in_radius(point p, real_t radius) const {
+        std::vector<typename grid<data_t>::cell> cells;
+
+        const coord c = get_coord(p);
+        const int c_x = c.x;
+        const int c_y = c.y;
+        const int radius_cells = std::ceil(radius / _cell_size);
+
+        for (int y = c_y - radius_cells; y <= c_y + radius_cells; ++y) {
+            for (int x = c_x - radius_cells; x <= c_x + radius_cells; ++x) {
+                if (x < 0 || x >= grid<data_t>::get_width() ||
+                    y < 0 || y >= grid<data_t>::get_height()) {
+                    continue;
+                }
+
+                cells.emplace_back(grid<data_t>::get_cell(x, y));
+            }
+        }
+
+        return cells;
+    }
+
+    using grid<data_t>::add_data;
     data_t& add_data(point p, const data_t& data) {
         coord c = get_coord(p);
-        return add_data(c.x, c.y, data);
+        return grid<data_t>::add_data(c.x, c.y, data);
     }
 
 private:

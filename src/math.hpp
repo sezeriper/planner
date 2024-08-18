@@ -6,7 +6,7 @@
 
 namespace rota {
 
-using real_t = float;
+using real_t = double;
 
 struct point {
     real_t x;
@@ -18,7 +18,7 @@ struct point {
 };
 
 constexpr real_t distance_sqr(const point a, const point b) {
-    return std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2);
+    return ((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y));
 }
 
 constexpr real_t distance(const point a, const point b) {

@@ -19,11 +19,27 @@ struct configuration {
     real_t angle;
 };
 
-static std::vector<configuration> sample_path_to_end(DubinsPath& path, double interval = 1.0) {
+constexpr bool operator==(const configuration& lhs, const configuration& rhs) {
+    return lhs.pos == rhs.pos && lhs.angle == rhs.angle;
+}
+
+static std::optional<DubinsPath> find_path(const configuration from, const configuration to, real_t rho) {
+    DubinsPath path;
+
+    real_t q0[] {from.pos.x, from.pos.y, from.angle};
+    real_t q1[] {to.pos.x, to.pos.y, to.angle};
+    bool result = dubins_shortest_path(&path, q0, q1, rho);
+    if (result == 0) {
+        return path;
+    }
+    return std::nullopt;
+}
+
+static std::vector<configuration> sample_path_to_end(DubinsPath& path, real_t interval = 0.1) {
     std::vector<configuration> path_points;
 
-    double q[3];
-    for (double t = 0.0;; t += interval) {
+    real_t q[3];
+    for (real_t t = 0.0;; t += interval) {
         int result = dubins_path_sample(&path, t, q);
         if (result != 0) break;
         path_points.push_back({{
@@ -41,28 +57,26 @@ static std::vector<configuration> sample_path_to_end(DubinsPath& path, double in
     return path_points;
 }
 
-static std::vector<configuration> sample_path_to_length(DubinsPath& path, double length, double interval = 1.0f) {
+static std::vector<configuration> sample_path_to_length(DubinsPath& path, real_t length, real_t interval = 0.1) {
     std::vector<configuration> path_points;
 
-    double q[3];
-    for (double t = 0.0; t < length; t += interval) {
+    real_t q[3];
+    for (real_t t = 0.0; t < length; t += interval) {
         int result = dubins_path_sample(&path, t, q);
         if (result != 0) break;
-        // path_points.push_back({{q[0], q[1]}, q[2]});
         path_points.push_back({{
             static_cast<real_t>(q[0]), static_cast<real_t>(q[1])},
             static_cast<real_t>(q[2])
         });
     }
 
-    double path_length = dubins_path_length(&path);
+    real_t path_length = dubins_path_length(&path);
     if (length < path_length) {
         dubins_path_sample(&path, length, q);
     }
     else {
         dubins_path_endpoint(&path, q);
     }
-    // path_points.push_back({{q[0], q[1]}, q[2]});
     path_points.push_back({{
         static_cast<real_t>(q[0]), static_cast<real_t>(q[1])},
         static_cast<real_t>(q[2])
@@ -96,8 +110,8 @@ public:
         obstacles(obstacles),
         border_min(find_border_min()),
         border_max(find_border_max()),
-        gen(std::random_device{}()),
-        dis_uni(0.0f, 1.0f)
+        dis_uni(0.0f, 1.0f),
+        gen(std::chrono::high_resolution_clock::now().time_since_epoch().count())
     {}
 
 protected:
@@ -109,8 +123,8 @@ protected:
     const std::vector<obstacle> obstacles;
     const point border_min;
     const point border_max;
-    std::mt19937 gen;
     std::uniform_real_distribution<real_t> dis_uni;
+    std::mt19937 gen;
 
     constexpr bool is_colliding(const point& point) const {
         if(!is_inside(point, border))
@@ -130,7 +144,7 @@ protected:
         return (get_rand_real() * (end - start)) + start;
     }
 
-    constexpr real_t get_rand_angle() { return get_rand_between(0.0f, std::numbers::pi_v<real_t> * 2.0f); }
+    constexpr real_t get_rand_angle() { return get_rand_between(-std::numbers::pi_v<real_t>, std::numbers::pi_v<real_t>); }
 
     constexpr point get_rand_point() {
         return {get_rand_between(border_min.x, border_max.x),
@@ -340,7 +354,7 @@ public:
         neighbour_radius{neighbour_radius},
         rho{rho},
         goal_node{},
-        nodes(border_min, border_max, neighbour_radius, 1024),
+        nodes(border_min, border_max, 8.0f, 1024),
         root{nullptr, 0.0f, start},
         root_ptr{&nodes.add_data(root.conf.pos, root)},
         node_list{ root_ptr }
@@ -387,12 +401,11 @@ private:
 
         const node_t* nearest = nearest_node(random_point.pos);
 
-        const auto path_opt = find_path(nearest->conf, random_point);
+        const auto path_opt = find_path(nearest->conf, random_point, rho);
         if (!path_opt) return {};
         auto path = path_opt.value();
 
         auto path_points = sample_path_to_length(path, step_size);
-        if (path_points.empty()) return {};
         if (is_colliding(path_points)) return {};
 
         auto new_conf = path_points.back();
@@ -402,14 +415,12 @@ private:
 
         const node_t* parent = std::get<0>(result);
         real_t cost = std::get<1>(result);
-        path_points = std::get<2>(result);
 
-        if (parent == nullptr && parent != root_ptr ||
-            cost == std::numeric_limits<real_t>::max() ||
-            path_points.size() < 2) return {};
+        if (parent == nullptr ||
+            cost == std::numeric_limits<real_t>::infinity()) return {};
+
+        if (is_colliding_with_neighbours(new_conf, neighbours)) return {};
         
-        new_conf = path_points.back();
-
         node_t& new_node = nodes.add_data(new_conf.pos, {
             parent,
             cost,
@@ -418,6 +429,13 @@ private:
         node_list.push_back(&new_node);
 
         return {&new_node, neighbours};
+    }
+
+    bool is_colliding_with_neighbours(const configuration& new_conf, const std::vector<node_t*>& neighbours) const {
+        for (const auto neighbour : neighbours) {
+            if (neighbour->conf == new_conf) return true;
+        }
+        return false;
     }
 
     void update_goal(const node_t& new_n) {
@@ -430,12 +448,11 @@ private:
 
     void update_neighbours(const node_t& new_n, const std::vector<node_t*> neighbours) {
         for (const auto neighbour : neighbours) {
-            auto path_opt = find_path(new_n.conf, neighbour->conf);
+            auto path_opt = find_path(new_n.conf, neighbour->conf, rho);
             if (!path_opt) continue;
 
             DubinsPath path = path_opt.value();
             real_t new_cost = new_n.cost + dubins_path_length(&path);
-
             if (new_cost >= neighbour->cost) continue;
 
             const auto path_points = sample_path_to_end(path);
@@ -467,6 +484,9 @@ private:
 
             for (node_t* node : node_list) {
                 if (node->parent == parent) {
+                    if (node->cost < parent_node->cost) {
+                        std::cout << "WTF???" << std::endl;
+                    }
                     children.push_back(node);
                     stack.push(node);
                 }
@@ -474,18 +494,6 @@ private:
         }
 
         return children;
-    }
-
-    std::optional<DubinsPath> find_path(const configuration from, const configuration to) const {
-        DubinsPath path;
-
-        double q0[] {from.pos.x, from.pos.y, from.angle};
-        double q1[] {to.pos.x, to.pos.y, to.angle};
-        bool result = dubins_shortest_path(&path, q0, q1, rho);
-        if (result == 0) {
-            return path;
-        }
-        return std::nullopt;
     }
 
     constexpr bool is_colliding(const std::vector<configuration>& path_points) const {
@@ -497,7 +505,7 @@ private:
         }
         return false;
     }
-    
+
     const node_t* nearest_node(const point p) const {
         real_t min_dist = std::numeric_limits<real_t>::max();
         const node_t* nearest;
@@ -535,20 +543,12 @@ private:
     std::vector<node_t*> find_neighbours(point p) const {
         std::vector<node_t*> neighbours;
 
-        const auto center = nodes.get_coord(p);
-        for (int y = -1; y <= 1; ++y) {
-            for (int x = -1; x <= 1; ++x) {
-                const grid_spatial<node_t>::coord cell_coord{center.x + x, center.y + y};
-                if (cell_coord.x < 0 || cell_coord.x >= nodes.get_width() || cell_coord.y < 0 || cell_coord.y >= nodes.get_height()) {
-                    continue;
-                }
-                auto cell = nodes.get_cell(center.x + x, center.y + y);
-
-                for (int i = 0; i < *cell.size; ++i) {
-                    point pos = cell.data[i].conf.pos;
-                    if (distance_sqr(pos, p) < (neighbour_radius * neighbour_radius)) {
-                        neighbours.push_back(cell.data + i);
-                    }
+        const auto cells = nodes.get_cells_in_radius(p, neighbour_radius);
+        for (const auto cell : cells) {
+            for (int i = 0; i < *cell.size; ++i) {
+                point pos = cell.data[i].conf.pos;
+                if (distance_sqr(pos, p) < (neighbour_radius * neighbour_radius)) {
+                    neighbours.push_back(cell.data + i);
                 }
             }
         }
@@ -556,31 +556,31 @@ private:
         return neighbours;
     }
 
-    std::tuple<const node_t*, real_t, std::vector<configuration>> find_best_parent(const configuration& conf, const std::vector<node_t*>& neighbours) const {
+    std::tuple<const node_t*, real_t> find_best_parent(const configuration& conf, const std::vector<node_t*>& neighbours) const {
         const node_t* best_parent = nullptr;
-        real_t min_cost = std::numeric_limits<real_t>::max();
-        std::vector<configuration> best_path_points;
+        real_t min_cost = std::numeric_limits<real_t>::infinity();
 
         for (const node_t* neighbour : neighbours) {
-            const auto path_opt = find_path(neighbour->conf, conf);
+            const auto path_opt = find_path(neighbour->conf, conf, rho);
             if (!path_opt) continue;
 
             DubinsPath path = path_opt.value();
-            if (dubins_path_length(&path) > step_size) continue;
+            real_t path_length = dubins_path_length(&path);
+            if (path_length > step_size) continue;
+
             const auto path_points = sample_path_to_end(path);
+            if (is_colliding(path_points)) continue;
 
-            if (path_points.size() < 2 || is_colliding(path_points)) continue;
-
-            real_t cost = neighbour->cost + dubins_path_length(&path);
+            real_t cost = neighbour->cost + path_length;
 
             if (cost < min_cost) {
                 best_parent = neighbour;
                 min_cost = cost;
-                best_path_points = std::move(path_points);
             }
         }
 
-        return {best_parent, min_cost, best_path_points};
+        
+        return {best_parent, min_cost};
     }
 };
 

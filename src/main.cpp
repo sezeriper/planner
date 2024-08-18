@@ -15,6 +15,13 @@
 
 using namespace rota;
 
+// node
+// {x:-37.925829929503145, y:-13.751036654833845}
+// 5.4973110736837274
+
+// paretn
+// {x:-40.711866057387674, y:-10.91062582069506}
+// 5.2772137872561924
 
 std::vector<path_planner::obstacle> gen_obstacles(std::size_t num)
 {
@@ -67,16 +74,16 @@ int main() {
         {{20.0f, 20.0f}, 10.0f},
     };
 
-    configuration start{{-45.0f, -45.0f}, PI * 0.5f};
-    configuration goal{{40.0f, 40.0f}, 0.0f};
+    configuration start{{-45.0f, 0.0f}, PI * -0.5f};
+    configuration goal{{40.0f, 0.0f}, PI * 0.5f};
 
     constexpr real_t RHO = 8.0f;
     constexpr real_t STEP_SIZE = 4.0f;
     constexpr real_t GOAL_RADIUS = STEP_SIZE;
-    constexpr real_t NB_RADIUS = 8.0f;
+    constexpr real_t NB_RADIUS = 4.0f;
     auto planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NB_RADIUS, RHO, border_points, obstacles);
 
-    camera cam(Vector3{50.0f, 50.0f, 50.0f});
+    camera cam;
 
     int node_count = 100;
     bool show_nodes = true;
