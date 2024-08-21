@@ -27,7 +27,7 @@ public:
 
         cam_angle.x -= mouse_dt.x;
         cam_angle.y += mouse_dt.y;
-        cam_angle = {Wrap(cam_angle.x, 0.0f, PI * 2.0f), Clamp(cam_angle.y, 0.1f, (PI / 2.0f) - 0.1f)};
+        cam_angle = {Wrap(cam_angle.x, 0.0f, PI * 2.0f), Clamp(cam_angle.y, 0.1f, (PI / 2.0f) - 0.0001f)};
 
         cam.position = {0.0f, 0.0f, -cam_dist};
         cam.position = Vector3RotateByAxisAngle(cam.position, Vector3{1.0f, 0.0f, 0.0f}, cam_angle.y);

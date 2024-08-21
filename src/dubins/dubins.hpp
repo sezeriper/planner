@@ -25,7 +25,7 @@
 #include "../math.hpp"
 using namespace rota;
 
-#define EPSILON (10e-10)
+constexpr real_t EPSILON = (10e-10);
 
 typedef enum 
 {
@@ -79,7 +79,7 @@ typedef int (*DubinsPathSamplingCallback)(real_t q[3], real_t t, void* user_data
  * @param rho   - turning radius of the vehicle (forward velocity divided by maximum angular velocity)
  * @return      - non-zero on error
  */
-int dubins_shortest_path(DubinsPath* path, real_t q0[3], real_t q1[3], real_t rho);
+int dubins_shortest_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho);
 
 /**
  * Generate a path with a specified word from an initial configuration to
@@ -92,14 +92,14 @@ int dubins_shortest_path(DubinsPath* path, real_t q0[3], real_t q1[3], real_t rh
  * @param pathType - the specific path type to use
  * @return         - non-zero on error
  */
-int dubins_path(DubinsPath* path, real_t q0[3], real_t q1[3], real_t rho, DubinsPathType pathType);
+int dubins_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho, DubinsPathType pathType);
 
 /**
  * Calculate the length of an initialised path
  *
  * @param path - the path to find the length of
  */
-real_t dubins_path_length(DubinsPath* path);
+real_t dubins_path_length(const DubinsPath& path);
 
 /**
  * Return the length of a specific segment in an initialized path
@@ -107,7 +107,7 @@ real_t dubins_path_length(DubinsPath* path);
  * @param path - the path to find the length of
  * @param i    - the segment you to get the length of (0-2)
  */
-real_t dubins_segment_length(DubinsPath* path, int i);
+real_t dubins_segment_length(const DubinsPath& path, int i);
 
 /**
  * Return the normalized length of a specific segment in an initialized path
@@ -115,7 +115,7 @@ real_t dubins_segment_length(DubinsPath* path, int i);
  * @param path - the path to find the length of
  * @param i    - the segment you to get the length of (0-2)
  */
-real_t dubins_segment_length_normalized( DubinsPath* path, int i );
+real_t dubins_segment_length_normalized( const DubinsPath& path, int i );
 
 /**
  * Extract an integer that represents which path type was used
@@ -123,7 +123,7 @@ real_t dubins_segment_length_normalized( DubinsPath* path, int i );
  * @param path    - an initialised path
  * @return        - one of LSL, LSR, RSL, RSR, RLR or LRL 
  */
-DubinsPathType dubins_path_type(DubinsPath* path);
+DubinsPathType dubins_path_type(const DubinsPath& path);
 
 /**
  * Calculate the configuration along the path, using the parameter t
@@ -133,7 +133,7 @@ DubinsPathType dubins_path_type(DubinsPath* path);
  * @param q    - the configuration result
  * @returns    - non-zero if 't' is not in the correct range
  */
-int dubins_path_sample(DubinsPath* path, real_t t, real_t q[3]);
+int dubins_path_sample(const DubinsPath& path, real_t t, real_t q[3]);
 
 /**
  * Walk along the path at a fixed sampling interval, calling the
@@ -148,7 +148,7 @@ int dubins_path_sample(DubinsPath* path, real_t t, real_t q[3]);
  *
  * @returns - zero on successful completion, or the result of the callback
  */
-int dubins_path_sample_many(DubinsPath* path, 
+int dubins_path_sample_many(const DubinsPath& path, 
                             real_t stepSize, 
                             DubinsPathSamplingCallback cb, 
                             void* user_data);
@@ -159,7 +159,7 @@ int dubins_path_sample_many(DubinsPath* path,
  * @param path - an initialised path
  * @param q    - the configuration result
  */
-int dubins_path_endpoint(DubinsPath* path, real_t q[3]);
+int dubins_path_endpoint(const DubinsPath& path, real_t q[3]);
 
 /**
  * Convenience function to extract a subset of a path
@@ -168,7 +168,7 @@ int dubins_path_endpoint(DubinsPath* path, real_t q[3]);
  * @param t       - a length measure, where 0 < t < dubins_path_length(path)
  * @param newpath - the resultant path
  */
-int dubins_extract_subpath(DubinsPath* path, real_t t, DubinsPath* newpath);
+int dubins_extract_subpath(const DubinsPath& path, real_t t, DubinsPath* newpath);
 
 #endif /* DUBINS_H */
 

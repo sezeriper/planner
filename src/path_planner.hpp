@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <numbers>
 #include <stack>
+#include <cstdlib>
 
 namespace rota {
 
@@ -28,56 +29,54 @@ static std::optional<DubinsPath> find_path(const configuration from, const confi
 
     real_t q0[] {from.pos.x, from.pos.y, from.angle};
     real_t q1[] {to.pos.x, to.pos.y, to.angle};
-    bool result = dubins_shortest_path(&path, q0, q1, rho);
+    bool result = dubins_shortest_path(path, q0, q1, rho);
     if (result == 0) {
         return path;
     }
     return std::nullopt;
 }
 
-static std::vector<configuration> sample_path_to_end(DubinsPath& path, real_t interval = 0.1) {
+static real_t find_path_length(const configuration from, const configuration to, real_t rho) {
+    const auto path_opt = find_path(from, to, rho);
+    if (!path_opt) return std::numeric_limits<real_t>::infinity();
+    const auto path = path_opt.value();
+    return dubins_path_length(path);
+}
+
+static std::vector<configuration> sample_path_to_end(DubinsPath& path, real_t interval = 0.1f) {
     std::vector<configuration> path_points;
 
     real_t q[3];
-    real_t length = dubins_path_length(&path);
-    for (real_t t = 0.0; t < length; t += interval) {
-        int result = dubins_path_sample(&path, t, q);
+    real_t length = dubins_path_length(path);
+    for (real_t t = 0.0f; t < length; t += interval) {
+        int result = dubins_path_sample(path, t, q);
         if (result != 0) break;
-        path_points.push_back({{
-            static_cast<real_t>(q[0]), static_cast<real_t>(q[1])},
-            static_cast<real_t>(q[2])
-        });
+        path_points.push_back({ {q[0], q[1]}, q[2] });
     }
 
-    dubins_path_endpoint(&path, q);
-    path_points.push_back({{
-        static_cast<real_t>(q[0]), static_cast<real_t>(q[1])},
-        static_cast<real_t>(q[2])
-    });
+    dubins_path_endpoint(path, q);
+    path_points.push_back({ {q[0], q[1]}, q[2] });
 
     return path_points;
 }
 
-static std::vector<configuration> sample_path_to_length(DubinsPath& path, real_t length, real_t interval = 0.1) {
+static std::vector<configuration> sample_path_to_length(DubinsPath& path, real_t length, real_t interval = 0.1f) {
     std::vector<configuration> path_points;
 
-    real_t path_length = dubins_path_length(&path);
+    real_t path_length = dubins_path_length(path);
 
     if ((path_length - length) < EPSILON) {
         return sample_path_to_end(path, interval);
     }
 
     real_t q[3];
-    for (real_t t = 0.0; t < length; t += interval) {
-        int result = dubins_path_sample(&path, t, q);
+    for (real_t t = 0.0f; t < length; t += interval) {
+        int result = dubins_path_sample(path, t, q);
         if (result != 0) break;
-        path_points.push_back({{
-            static_cast<real_t>(q[0]), static_cast<real_t>(q[1])},
-            static_cast<real_t>(q[2])
-        });
+        path_points.push_back({ {q[0], q[1]}, q[2] });
     }
 
-    dubins_path_sample(&path, length, q);
+    dubins_path_sample(path, length, q);
 
     return path_points;
 }
@@ -107,8 +106,9 @@ public:
         obstacles(obstacles),
         border_min(find_border_min()),
         border_max(find_border_max()),
-        dis_uni(0.0f, 1.0f),
-        gen(std::chrono::high_resolution_clock::now().time_since_epoch().count())
+        dis_real(0.0f, 1.0f),
+        dis_int(),
+        gen(std::random_device{}())
     {}
 
 protected:
@@ -120,7 +120,8 @@ protected:
     const std::vector<obstacle> obstacles;
     const point border_min;
     const point border_max;
-    std::uniform_real_distribution<real_t> dis_uni;
+    std::uniform_real_distribution<real_t> dis_real;
+    std::uniform_int_distribution<int> dis_int;
     std::mt19937 gen;
 
     constexpr bool is_colliding(const point& point) const {
@@ -135,7 +136,12 @@ protected:
         return false;
     }
 
-    constexpr real_t get_rand_real() { return dis_uni(gen); }
+    constexpr int get_rand_int(int start, int end) {
+        dis_int.param(std::uniform_int_distribution<int>::param_type(start, end));
+        return dis_int(gen);
+    }
+
+    constexpr real_t get_rand_real() { return dis_real(gen); }
 
     constexpr real_t get_rand_between(real_t start, real_t end) {
         return (get_rand_real() * (end - start)) + start;
@@ -188,23 +194,23 @@ public:
         const real_t goal_radius = 1.0f,
         const std::vector<point>& border = {},
         const std::vector<obstacle>& obstacles = {},
-        const real_t neighbour_radius = 4.0f
+        const real_t near_radius = 4.0f
     ) :
         path_planner(start, goal, step_size, goal_radius, border, obstacles),
-        neighbour_radius(neighbour_radius),
+        near_radius(near_radius),
         root{nullptr, 0.0f, start},
         goal_node{},
-        nodes(border_min, border_max, neighbour_radius*2.0f, 512)
+        nodes(border_min, border_max, near_radius*2.0f, 512)
     {
         nodes.add_data(start, root);
     }
 
     void step(std::size_t num_steps = 1) {
         for (std::size_t i = 0; i < num_steps;) {
-            point random_point{get_rand_point()};
-            if (is_colliding(random_point)) { continue; }
-            point nearest_position = nearest_node_position(random_point);
-            point direction = normalize(subtract(random_point, nearest_position));
+            point rand_conf{get_rand_point()};
+            if (is_colliding(rand_conf)) { continue; }
+            point nearest_position = nearest_node_position(rand_conf);
+            point direction = normalize(subtract(rand_conf, nearest_position));
             point new_p = add(nearest_position, scale(direction, step_size));
             if (is_colliding(new_p)) { continue; }
 
@@ -248,7 +254,7 @@ public:
     }
 
 private:
-    real_t neighbour_radius;
+    real_t near_radius;
     node_t root;
     node_t goal_node;
     grid_spatial<node_t> nodes;
@@ -300,7 +306,7 @@ private:
 
                 for (int i = 0; i < *cell.size; ++i) {
                     point pos = cell.data[i].position;
-                    if (distance_sqr(pos, p) < neighbour_radius * neighbour_radius) {
+                    if (distance_sqr(pos, p) < near_radius * near_radius) {
                         neighbours.push_back(cell.data + i);
                     }
                 }
@@ -342,31 +348,100 @@ public:
         const configuration& goal,
         real_t step_size,
         real_t goal_radius,
-        real_t neighbour_radius,
+        real_t near_radius,
         real_t rho,
         const std::vector<point>& border,
         const std::vector<obstacle>& obstacles
     ) :
         path_planner(start.pos, goal.pos, step_size, goal_radius, border, obstacles),
-        neighbour_radius{neighbour_radius},
         rho{rho},
-        goal_node{},
-        nodes(border_min, border_max, 8.0f, 1024),
-        root{nullptr, 0.0f, start},
-        root_ptr{&nodes.add_data(root.conf.pos, root)},
-        node_list{ root_ptr }
+        goal_node{nullptr, std::numeric_limits<real_t>::infinity(), goal},
+        nodes(border_min, border_max, 4.0f, 1024),
+        root_ptr{&nodes.add_data(start.pos, {nullptr, 0.0f, start})},
+        node_list{root_ptr},
+        near_radius{near_radius}
     {}
 
-    void step(int num_steps = 1) {
-        for (int i = 0; i < num_steps;) {
-            auto [node_ptr, neighbours] = add_node();
-            if (!node_ptr) continue;
+    void step() {
+        auto [node_ptr, neighbours] = add_node();
+        if (!node_ptr) return;
 
-            const node_t& node_t = *node_ptr;
-            update_neighbours(node_t, neighbours);
-            update_goal(node_t);
-            ++i;
+        const node_t& node_t = *node_ptr;
+        update_neighbours(node_t, neighbours);
+    }
+
+    void run_for_ms(std::chrono::milliseconds ms, int batch_size = 200) {
+        auto start = std::chrono::high_resolution_clock::now();
+        while (true) {
+            for (int i = 0; i < batch_size; ++i) {
+                step();
+            }
+            auto now = std::chrono::high_resolution_clock::now();
+            if (now - start > ms) break;
         }
+        try_reach_goal();
+    }
+
+    std::vector<configuration> get_path_to_goal(real_t interval) const {
+        std::vector<configuration> confs;
+        const node_t* current = &goal_node;
+
+        while (current != nullptr) {
+            confs.push_back(current->conf);
+            current = current->parent;
+        }
+
+        std::reverse(confs.begin(), confs.end());
+
+        real_t rem = 0.0f;
+        std::vector<configuration> path;
+        for (std::size_t i = 0; i < confs.size() - 1; ++i) {
+            const auto path_opt = find_path(confs[i], confs[i + 1], rho);
+            if (!path_opt) return {};
+
+            DubinsPath dubins_path = path_opt.value();
+            const real_t path_length = dubins_path_length(dubins_path);
+
+            real_t t = rem;
+            while (t < path_length) {
+                real_t q[3];
+                dubins_path_sample(dubins_path, t, q);
+                path.push_back({{q[0], q[1]}, q[2]});
+                t += interval;
+            }
+
+            rem = t - path_length;
+        }
+
+        path.push_back(confs.back());
+
+        return path;
+    }
+
+    std::vector<configuration> simplify_path(std::vector<configuration> path, int max_iter = 10000) {
+        for (int i = 0; i < max_iter; ++i) {
+            if (path.size() < 3) return path;
+
+            int a = get_rand_int(0, path.size() - 3);
+            int b = get_rand_int(2, path.size() - 1);
+
+            while (b - a < 2) {
+                b = get_rand_int(2, path.size() - 1);
+            }
+
+            const auto conf1 = path[a];
+            const auto conf2 = path[b];
+
+            const auto path_opt = find_path(conf1, conf2, rho);
+            if (!path_opt) return {};
+
+            DubinsPath dubins_path = path_opt.value();
+            const auto sub_path = sample_path_to_end(dubins_path);
+            if (is_colliding(sub_path)) continue;
+
+            path.erase(path.begin() + a + 1, path.begin() + b);
+        }
+        return path;
     }
 
     int get_node_count() const { return node_list.size(); }
@@ -384,24 +459,50 @@ public:
     }
 
 private:
-    real_t neighbour_radius;
-    real_t rho;
+    const real_t rho;
     node_t goal_node;
     grid_spatial<node_t> nodes;
-    node_t root;
     node_t* root_ptr;
     std::vector<node_t*> node_list;
+    const real_t near_radius;
+
+    void try_reach_goal() {
+        const auto cells = nodes.get_cells_in_radius(goal_node.conf.pos, near_radius);
+
+        for (const auto cell : cells) {
+            for (int i = 0; i < *cell.size; ++i) {
+                const node_t& n = cell.data[i];
+
+                const auto path_opt = find_path(n.conf, goal_node.conf, rho);
+                if (!path_opt) continue;
+
+                DubinsPath path = path_opt.value();
+                real_t path_length = dubins_path_length(path);
+                
+                if (path_length > goal_radius) continue;
+
+                const auto path_points = sample_path_to_end(path);
+                if (is_colliding(path_points)) continue;
+
+                real_t cost = n.cost + path_length;
+                if (cost < goal_node.cost) {
+                    goal_node.parent = &n;
+                    goal_node.cost = cost;
+                }
+            }
+        }
+    }
 
     std::tuple<const node_t*, std::vector<node_t*>> add_node() {
-        configuration random_point {get_rand_point(), get_rand_angle()};
-        if (path_planner::is_colliding(random_point.pos)) return {};
+        configuration rand_conf {get_rand_point(), get_rand_angle()};
+        if (path_planner::is_colliding(rand_conf.pos)) return {};
 
-        const node_t* nearest = nearest_node(random_point.pos);
+        const node_t* nearest = nearest_node(rand_conf);
 
-        const auto path_opt = find_path(nearest->conf, random_point, rho);
+        const auto path_opt = find_path(nearest->conf, rand_conf, rho);
         if (!path_opt) return {};
-        auto path = path_opt.value();
 
+        auto path = path_opt.value();
         auto path_points = sample_path_to_length(path, step_size);
         if (is_colliding(path_points)) return {};
 
@@ -409,14 +510,10 @@ private:
         const auto neighbours = find_neighbours(new_conf.pos);
         if (is_colliding_with_neighbours(new_conf, neighbours)) return {};
 
-        const auto result = find_best_parent(new_conf, neighbours);
-
-        const node_t* parent = std::get<0>(result);
-        real_t cost = std::get<1>(result);
+        const auto [parent, cost] = find_best_parent(new_conf, neighbours);
 
         if (parent == nullptr ||
             cost == std::numeric_limits<real_t>::infinity()) return {};
-
 
         node_t& new_node = nodes.add_data(new_conf.pos, {
             parent,
@@ -428,19 +525,13 @@ private:
         return {&new_node, neighbours};
     }
 
-    bool is_colliding_with_neighbours(const configuration& new_conf, const std::vector<node_t*>& neighbours) const {
+    bool is_colliding_with_neighbours(const configuration& conf, const std::vector<node_t*>& neighbours) const {
         for (const auto neighbour : neighbours) {
-            if (neighbour->conf == new_conf) return true;
-        }
-        return false;
-    }
-
-    void update_goal(const node_t& new_n) {
-        if (distance_sqr(new_n.conf.pos, goal) < (goal_radius * goal_radius)) {
-            if (goal_node.parent == nullptr || new_n.cost < goal_node.cost) {
-                goal_node = new_n;
+            if (neighbour->conf == conf) {
+                return true;
             }
         }
+        return false;
     }
 
     void update_neighbours(const node_t& new_n, const std::vector<node_t*> neighbours) {
@@ -450,12 +541,11 @@ private:
 
             DubinsPath path = path_opt.value();
 
-            real_t path_length = dubins_path_length(&path);
+            real_t path_length = dubins_path_length(path);
             if (path_length > step_size) continue;
 
             real_t new_cost = new_n.cost + path_length;
             if (new_cost >= neighbour->cost) continue;
-
 
             const auto path_points = sample_path_to_end(path);
             if (is_colliding(path_points)) continue;
@@ -485,9 +575,6 @@ private:
 
             for (node_t* node : node_list) {
                 if (node->parent == parent) {
-                    if (node->cost < parent_node->cost) {
-                        std::cout << "WTF???" << std::endl;
-                    }
                     children.push_back(node);
                     stack.push(node);
                 }
@@ -507,13 +594,15 @@ private:
         return false;
     }
 
-    const node_t* nearest_node(const point p) const {
-        real_t min_dist = std::numeric_limits<real_t>::max();
+    const node_t* nearest_node(const configuration& c) const {
+        real_t min_dist = std::numeric_limits<real_t>::infinity();
         const node_t* nearest;
 
+        const int min_search_dist = std::ceil(near_radius / nodes.get_cell_size()) + 1;
+
         int dist = 0;
-        const auto center = nodes.get_coord(p);
-        while (min_dist == std::numeric_limits<real_t>::max() || dist < 2) {
+        const auto center = nodes.get_coord(c.pos);
+        while (min_dist == std::numeric_limits<real_t>::infinity() || dist < min_search_dist) {
             for (int y = -dist; y <= dist; ++y) {
                 for (int x = -dist; x <= dist; ++x) {
                     grid_spatial<node_t>::coord cell_coord {center.x + x, center.y + y};
@@ -528,7 +617,8 @@ private:
                     auto cell = nodes.get_cell(cell_coord.x, cell_coord.y);
                     for (int i = 0; i < *cell.size; ++i) {
                         const node_t& n = cell.data[i];
-                        real_t dist = distance_sqr(p, n.conf.pos);
+                        real_t dist = find_path_length(n.conf, c, rho);
+                        // real_t dist = distance_sqr(n.conf.pos, c.pos);
                         if (dist < min_dist) {
                             min_dist = dist;
                             nearest = &n;
@@ -544,11 +634,11 @@ private:
     std::vector<node_t*> find_neighbours(point p) const {
         std::vector<node_t*> neighbours;
 
-        const auto cells = nodes.get_cells_in_radius(p, neighbour_radius);
+        const auto cells = nodes.get_cells_in_radius(p, near_radius);
         for (const auto cell : cells) {
             for (int i = 0; i < *cell.size; ++i) {
                 point pos = cell.data[i].conf.pos;
-                if (distance_sqr(pos, p) < (neighbour_radius * neighbour_radius)) {
+                if (distance_sqr(pos, p) < (near_radius * near_radius)) {
                     neighbours.push_back(cell.data + i);
                 }
             }
@@ -566,8 +656,8 @@ private:
             if (!path_opt) continue;
 
             DubinsPath path = path_opt.value();
-            real_t path_length = dubins_path_length(&path);
-            if (path_length > step_size) continue;
+            real_t path_length = dubins_path_length(path);
+            if (path_length > near_radius) continue;
 
             const auto path_points = sample_path_to_end(path);
             if (is_colliding(path_points)) continue;
@@ -584,5 +674,4 @@ private:
         return {best_parent, min_cost};
     }
 };
-
 }

@@ -15,14 +15,6 @@
 
 using namespace rota;
 
-// node
-// {x:8.5888689644257905, y:-30.007781027775618}
-// 0.20150693767436678
-
-// paretn
-// {x:5.1038619481162932, y:-31.670878807682591}
-// 0.68661541474269328
-
 std::vector<path_planner::obstacle> gen_obstacles(std::size_t num)
 {
     std::mt19937 gen(std::random_device{}());
@@ -78,17 +70,18 @@ int main() {
     configuration goal{{40.0f, 0.0f}, PI * 0.5f};
 
     constexpr real_t RHO = 8.0f;
-    constexpr real_t STEP_SIZE = 4.0f;
+    constexpr real_t STEP_SIZE = 16.0f;
+    constexpr real_t NEAR_RADIUS = 16.0f;
     constexpr real_t GOAL_RADIUS = STEP_SIZE;
-    constexpr real_t NB_RADIUS = 4.0f;
-    auto planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NB_RADIUS, RHO, border_points, obstacles);
+    auto planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
 
     camera cam;
 
-    int node_count = 100;
+    int run_time = 1000;
     bool show_nodes = true;
     bool do_sample = false;
     bool do_reset = false;
+    std::vector<configuration> path;
     while (!WindowShouldClose())
     {
         cam.update();
@@ -104,10 +97,9 @@ int main() {
             vis.draw_nodes(planner->get_nodes(), RHO);
         }
         else {
-            vis.draw_goal_path(planner->get_goal_node(), RHO);
+            vis.draw_path_smooth(path, RHO, 0.0f, GREEN);
         }
         vis.draw_grid(planner->get_grid());
-        // vis.draw_path(path_points);
         vis.draw_configuration(start);
         vis.draw_configuration(goal);
 
@@ -117,7 +109,7 @@ int main() {
             rlImGuiBegin();
             ImGui::Begin("Menu");
 
-                ImGui::SliderInt("Node Count", &node_count, 1, 10000);
+                ImGui::SliderInt("Node Count", &run_time, 1, 10000);
                 do_sample = ImGui::Button("Sample", ImVec2(100, 20));
                 do_reset = ImGui::Button("Reset", ImVec2(100, 20));
                 auto added_nodes = std::to_string(planner->get_node_count());
@@ -133,13 +125,18 @@ int main() {
         EndDrawing();
 
         if (IsKeyPressed(KEY_SPACE) || do_reset) {
-            // obstacles = gen_obstacles(NUM_OBSTACLES);
-            planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NB_RADIUS, RHO, border_points, obstacles);
+            planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
         }
 
         if (IsKeyPressed(KEY_ENTER) || do_sample) {
-            timer t("RRT*");
-            planner->step(node_count);
+            {
+                timer t("Path Planning");
+                planner->run_for_ms(std::chrono::milliseconds(run_time));
+            }
+            {
+                timer t("Path Sampling");
+                path = planner->simplify_path(planner->get_path_to_goal(0.1f));
+            }
         }
 
     }

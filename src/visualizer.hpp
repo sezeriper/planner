@@ -25,10 +25,10 @@ public:
     void draw_nodes(const std::span<path_planner_rrt_star::node_t> nodes, path_planner_rrt_star::node_t goal_node) const {
 while (goal_node.parent != nullptr) {
             const auto& parent = *goal_node.parent;
-            DrawModel(model_node, {static_cast<float>(goal_node.position.x), 0.0f, static_cast<float>(goal_node.position.y)}, 3.0f, GREEN);
+            DrawModel(model_node, {goal_node.position.x, 0.0f, goal_node.position.y}, 3.0f, GREEN);
 
-            DrawLine3D(Vector3{static_cast<float>(goal_node.position.x), 0.0f, static_cast<float>(goal_node.position.y)},
-                    Vector3{static_cast<float>(parent.position.x), 0.0f, static_cast<float>(parent.position.y)},
+            DrawLine3D(Vector3{goal_node.position.x, 0.0f, goal_node.position.y},
+                    Vector3{parent.position.x, 0.0f, parent.position.y},
                     GREEN);
 
             goal_node = parent;
@@ -52,60 +52,54 @@ while (goal_node.parent != nullptr) {
         for (std::size_t i = 0; i < nodes.size(); ++i) {
             const auto node = nodes[i];
             if (node.parent == nullptr) continue;
-
             const auto parent = *node.parent;
-
-            auto path_opt = find_path(parent.conf, node.conf, rho);
-            if (!path_opt) continue;
-            auto path = path_opt.value();
-            real_t path_length = dubins_path_length(&path);
-            if (path_length > 4.1f) {
-                std::cout << "Path length: " << path_length << std::endl;
-            }
-            auto points = sample_path_to_end(path);
-
-            draw_path(points, 0.0f, PURPLE);
+            draw_path_smooth({parent.conf, node.conf}, rho, 0.0f, PURPLE);
         }
     }
 
     void draw_goal_path(path_planner_rrt_star_dubins::node_t goal_node, real_t rho) const {
         while (goal_node.parent != nullptr) {
             const auto& parent = *goal_node.parent;
-
-            auto path_opt = find_path(parent.conf, goal_node.conf, rho);
-            if (!path_opt) continue;
-            auto path = path_opt.value();
-            auto points = sample_path_to_end(path);
-
-            draw_path(points, 0.0f, GREEN);
-
+            draw_path_smooth({parent.conf, goal_node.conf}, rho, 0.0f, GREEN);
             goal_node = parent;
         }
     }
 
     void draw_configuration(configuration conf) {
-        DrawModel(model_node, {static_cast<float>(conf.pos.x), 0.0f, static_cast<float>(conf.pos.y)}, 3.0f, BLUE);
+        DrawModel(model_node, {(conf.pos.x), 0.0f, (conf.pos.y)}, 3.0f, BLUE);
 
         point p2 {std::cos(conf.angle), std::sin(conf.angle)};
         p2 = scale(p2, 5.0f);
         p2 = add(conf.pos, p2);
 
-        DrawLine3D(Vector3{static_cast<float>(conf.pos.x), 0.0f, static_cast<float>(conf.pos.y)},
-                Vector3{static_cast<float>(p2.x), 0.0f, static_cast<float>(p2.y)},
+        DrawLine3D(Vector3{conf.pos.x, 0.0f, conf.pos.y},
+                Vector3{p2.x, 0.0f, p2.y},
                 BLUE);
     }
 
     void draw_obstacles(const std::vector<path_planner::obstacle>& obstacles) const {
         for (const auto& obstacle : obstacles) {
-            DrawCylinder({static_cast<float>(obstacle.position.x), 0.0f, static_cast<float>(obstacle.position.y)}, obstacle.radius - 2.0f, obstacle.radius - 2.0f, 5.0f, 32, BLACK);
+            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius - 2.0f, 5.0f, 32, BLACK);
         }
     }
 
-    void draw_path(const std::vector<configuration>& path, real_t height = 0.0f, Color color = BLUE) const {
+    void draw_path_simple(const std::vector<configuration>& path, real_t height = 0.0f, Color color = BLUE) const {
         for (std::size_t i = 0; i < path.size() - 1; ++i) {
-            DrawLine3D(Vector3{static_cast<float>(path[i].pos.x), static_cast<float>(height), static_cast<float>(path[i].pos.y)},
-                    Vector3{static_cast<float>(path[i + 1].pos.x), static_cast<float>(height), static_cast<float>(path[i + 1].pos.y)},
+            DrawLine3D(Vector3{path[i].pos.x, height, path[i].pos.y},
+                    Vector3{path[i + 1].pos.x, height, path[i + 1].pos.y},
                     color);
+        }
+    }
+
+    void draw_path_smooth(const std::vector<configuration>& path, real_t rho, real_t height = 0.0f, Color color = BLUE) const {
+        if (path.size() < 2) return;
+
+        for (std::size_t i = 0; i < path.size() - 1; ++i) {
+            auto path_opt = find_path(path[i], path[i + 1], rho);
+            if (!path_opt) return;
+            const auto path_smooth = sample_path_to_end(path_opt.value());
+
+            draw_path_simple(path_smooth, height, color);
         }
     }
 
@@ -117,17 +111,15 @@ while (goal_node.parent != nullptr) {
         point tl = g.get_top_left();
 
         for (real_t i = 0.0f; i <= w; ++i) {
-            Vector3 start {static_cast<float>(tl.x + i * cell_size), 0.0f, static_cast<float>(tl.y)};
-            Vector3 end {static_cast<float>(tl.x + i * cell_size), 0.0f, static_cast<float>(tl.y + h * cell_size)};
-            DrawLine3D(start, end,
-                    BLACK);
+            Vector3 start {tl.x + i * cell_size, 0.0f, tl.y};
+            Vector3 end {tl.x + i * cell_size, 0.0f, tl.y + h * cell_size};
+            DrawLine3D(start, end, BLACK);
         }
 
         for (real_t i = 0.0f; i <= h; ++i) {
-            Vector3 start {static_cast<float>(tl.x), 0.0f, static_cast<float>(tl.y + i * cell_size)};
-            Vector3 end {static_cast<float>(tl.x + w * cell_size), 0.0f, static_cast<float>(tl.y + i * cell_size)};
-            DrawLine3D(start, end,
-                    BLACK);
+            Vector3 start {tl.x, 0.0f, tl.y + i * cell_size};
+            Vector3 end {tl.x + w * cell_size, 0.0f, tl.y + i * cell_size};
+            DrawLine3D(start, end, BLACK);
         }
     }
 

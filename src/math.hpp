@@ -6,7 +6,7 @@
 
 namespace rota {
 
-using real_t = double;
+using real_t = float;
 
 struct point {
     real_t x;
