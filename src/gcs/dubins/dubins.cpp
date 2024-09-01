@@ -27,9 +27,6 @@
 #include <numbers>
 #include <limits>
 
-constexpr real_t PI = std::numbers::pi_v<real_t>;
-constexpr real_t INF = std::numeric_limits<real_t>::infinity();
-
 typedef enum 
 {
     L_SEG = 0,
@@ -62,24 +59,24 @@ typedef struct
 
 
 int dubins_word(DubinsIntermediateResults* in, DubinsPathType pathType, real_t out[3]);
-int dubins_intermediate_results(DubinsIntermediateResults* in, real_t q0[3], real_t q1[3], real_t rho);
+int dubins_intermediate_results(DubinsIntermediateResults* in, const real_t q0[3], const real_t q1[3], real_t rho);
 
 /**
  * Floating point modulus suitable for rings
  *
  * fmod doesn't behave correctly for angular quantities, this function does
  */
-real_t fmodr( real_t x, real_t y)
+constexpr real_t fmodr(real_t x, real_t y)
 {
-    return x - y*std::floor(x/y);
+    return x - y * std::floor(x/y);
 }
 
-real_t mod2pi( real_t theta )
+constexpr real_t mod2pi(real_t theta)
 {
-    return fmodr( theta, 2.0f * PI );
+    return fmodr(theta, 2.0f * PI);
 }
 
-int dubins_shortest_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho)
+int dubins_shortest_path(DubinsPath& path, const real_t q0[3], const real_t q1[3], real_t rho)
 {
     int i, errcode;
     DubinsIntermediateResults in;
@@ -91,7 +88,6 @@ int dubins_shortest_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rh
     if(errcode != EDUBOK) {
         return errcode;
     }
-
 
     path.qi[0] = q0[0];
     path.qi[1] = q0[1];
@@ -208,7 +204,7 @@ int dubins_path_sample( const DubinsPath& path, real_t t, real_t q[3] )
     const SegmentType* types = DIRDATA[path.type];
     real_t p1, p2;
 
-    if( t < 0 || t > dubins_path_length(path) ) {
+    if( t < 0.0f || t > dubins_path_length(path) ) {
         return EDUBPARAM;
     }
 
@@ -268,7 +264,7 @@ int dubins_extract_subpath( const DubinsPath& path, real_t t, DubinsPath* newpat
     /* calculate the true parameter */
     real_t tprime = t / path.rho;
 
-    if((t < 0) || (t > dubins_path_length(path)))
+    if((t < 0.0f) || (t > dubins_path_length(path)))
     {
         return EDUBPARAM; 
     }
@@ -287,10 +283,10 @@ int dubins_extract_subpath( const DubinsPath& path, real_t t, DubinsPath* newpat
     return 0;
 }
 
-int dubins_intermediate_results(DubinsIntermediateResults* in, real_t q0[3], real_t q1[3], real_t rho)
+int dubins_intermediate_results(DubinsIntermediateResults* in, const real_t q0[3], const real_t q1[3], real_t rho)
 {
     real_t dx, dy, D, d, theta, alpha, beta;
-    if(0.0f) {
+    if(rho <= 0.0f) {
         return EDUBBADRHO;
     }
 
@@ -298,10 +294,10 @@ int dubins_intermediate_results(DubinsIntermediateResults* in, real_t q0[3], rea
     dy = q1[1] - q0[1];
     D = std::sqrt( dx * dx + dy * dy );
     d = D / rho;
-    theta = 0;
+    theta = 0.0f;
 
     /* test required to prevent domain errors if dx=0 and dy=0 */
-    if(d > 0) {
+    if(d > 0.0f) {
         theta = mod2pi(std::atan2( dy, dx ));
     }
     alpha = mod2pi(q0[2] - theta);

@@ -3,10 +3,15 @@
 #include <cstdint>
 #include <cmath>
 #include <vector>
+#include <numbers>
 
 namespace rota {
 
 using real_t = float;
+
+constexpr real_t PI = std::numbers::pi_v<real_t>;
+constexpr real_t TWO_PI = 2.0f * PI;
+constexpr real_t INF = std::numeric_limits<real_t>::max();
 
 struct point {
     real_t x;

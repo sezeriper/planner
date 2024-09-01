@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+service air_control {
+    rpc record_trajectory(stream configuration_t) returns (empty_t) {}
+}
+
+message empty_t {}
+
+message point_t {
+    float x = 1;
+    float y = 2;
+}
+
+message configuration_t {
+    point_t position = 1;
+    float yaw = 2;
+}

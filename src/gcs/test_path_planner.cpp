@@ -1,6 +1,5 @@
 #include "path_planner.hpp"
 #include "visualizer.hpp"
-#include "utils.hpp"
 #include "camera.hpp"
 
 #include <raylib.h>
@@ -8,6 +7,8 @@
 #include <raymath.h>
 #include <imgui.h>
 #include <rlImGui.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 #include <memory>
 #include <chrono>
@@ -66,14 +67,14 @@ int main() {
         {{20.0f, 20.0f}, 10.0f},
     };
 
-    configuration start{{-45.0f, 0.0f}, PI * -0.5f};
-    configuration goal{{40.0f, 0.0f}, PI * 0.5f};
+    configuration_t start{-45.0f, 0.0f, PI * -0.5f};
+    configuration_t goal{40.0f, 0.0f, PI * 0.5f};
 
-    constexpr real_t RHO = 8.0f;
-    constexpr real_t STEP_SIZE = 16.0f;
-    constexpr real_t NEAR_RADIUS = 16.0f;
-    constexpr real_t GOAL_RADIUS = STEP_SIZE;
-    auto planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
+    real_t RHO = 8.0f;
+    real_t STEP_SIZE = 8.0f;
+    real_t NEAR_RADIUS = 16.0f;
+    real_t GOAL_RADIUS = 16.0f;
+    auto planner = std::make_unique<rrtstar_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
 
     camera cam;
 
@@ -81,7 +82,9 @@ int main() {
     bool show_nodes = true;
     bool do_sample = false;
     bool do_reset = false;
-    std::vector<configuration> path;
+    std::vector<DubinsPath> paths;
+    trajectory_t traj;
+    trajectory_t traj_simple;
     while (!WindowShouldClose())
     {
         cam.update();
@@ -94,12 +97,15 @@ int main() {
         vis.draw_border();
         vis.draw_obstacles(obstacles);
         if (show_nodes) {
-            vis.draw_nodes(planner->get_nodes(), RHO);
+            if (planner->get_node_count() > 1)  {
+                vis.draw_nodes(planner->get_nodes(), RHO);
+            }
         }
         else {
-            vis.draw_path_smooth(path, RHO, 0.0f, GREEN);
+            vis.draw_paths(paths, 0.0f, GREEN);
+            // vis.draw_traj_simple(traj, 0.0f, BLUE);
+            vis.draw_traj_smooth(traj_simple, RHO, 0.0f, RED);
         }
-        vis.draw_grid(planner->get_grid());
         vis.draw_configuration(start);
         vis.draw_configuration(goal);
 
@@ -117,6 +123,10 @@ int main() {
                     show_nodes = !show_nodes;
                 }
                 ImGui::Text(added_nodes.c_str());
+                ImGui::SliderFloat("Min Radius", &RHO, 1.0f, 64.0f);
+                ImGui::SliderFloat("Step Size", &STEP_SIZE, 1.0f, 64.0f);
+                ImGui::SliderFloat("Near Radius", &NEAR_RADIUS, 1.0f, 64.0f);
+                ImGui::SliderFloat("Goal Radius", &GOAL_RADIUS, 1.0f, 64.0f);
 
             ImGui::End();
             rlImGuiEnd();
@@ -125,18 +135,21 @@ int main() {
         EndDrawing();
 
         if (IsKeyPressed(KEY_SPACE) || do_reset) {
-            planner = std::make_unique<path_planner_rrt_star_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
+            planner = std::make_unique<rrtstar_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
         }
 
         if (IsKeyPressed(KEY_ENTER) || do_sample) {
-            {
-                timer t("Path Planning");
-                planner->run_for_ms(std::chrono::milliseconds(run_time));
-            }
-            {
-                timer t("Path Sampling");
-                path = planner->simplify_path(planner->get_path_to_goal(0.1f));
-            }
+            spdlog::stopwatch sw;
+            planner->run_for_ms(std::chrono::milliseconds(run_time));
+            // planner->run_for_iter(run_time);
+            spdlog::info("RRT* Dubins took {} ms", sw.elapsed_ms().count());
+
+            sw.reset();
+
+            paths = planner->get_paths_to_goal();
+            traj = sample_paths(paths, 0.1f);
+            traj_simple = planner->simplify_path(traj);
+            spdlog::info("Simplification took {} ms", sw.elapsed_ms().count());
         }
 
     }

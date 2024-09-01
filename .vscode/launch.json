@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "debug",
             "preLaunchTask": "build-debug",
-            "program": "${workspaceFolder}/build/path_planner",
+            "program": "${workspaceFolder}/build/gcs",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
@@ -19,7 +19,7 @@
             "request": "launch",
             "name": "release",
             "preLaunchTask": "build-release",
-            "program": "${workspaceFolder}/build/path_planner",
+            "program": "${workspaceFolder}/build/gcs",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
@@ -29,7 +29,7 @@
             "request": "launch",
             "name": "relwithdeb",
             "preLaunchTask": "build-relwithdeb",
-            "program": "${workspaceFolder}/build/path_planner",
+            "program": "${workspaceFolder}/build/gcs",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"

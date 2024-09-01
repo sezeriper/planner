@@ -25,9 +25,9 @@
 #include "../math.hpp"
 using namespace rota;
 
-constexpr real_t EPSILON = (10e-10);
+constexpr real_t EPSILON = 10e-10;
 
-typedef enum 
+enum DubinsPathType : int
 {
     LSL = 0,
     LSR = 1,
@@ -35,16 +35,16 @@ typedef enum
     RSR = 3,
     RLR = 4,
     LRL = 5
-} DubinsPathType;
+};
 
 typedef struct 
 {
     /* the initial configuration */
-    real_t qi[3];        
+    real_t qi[3];
     /* the lengths of the three segments */
-    real_t param[3];     
+    real_t param[3];
     /* model forward velocity / model angular velocity */
-    real_t rho;          
+    real_t rho;
     /* the path type described */
     DubinsPathType type; 
 } DubinsPath;
@@ -79,7 +79,7 @@ typedef int (*DubinsPathSamplingCallback)(real_t q[3], real_t t, void* user_data
  * @param rho   - turning radius of the vehicle (forward velocity divided by maximum angular velocity)
  * @return      - non-zero on error
  */
-int dubins_shortest_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho);
+int dubins_shortest_path(DubinsPath& path, const real_t q0[3], const real_t q1[3], real_t rho);
 
 /**
  * Generate a path with a specified word from an initial configuration to

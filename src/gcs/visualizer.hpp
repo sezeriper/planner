@@ -22,57 +22,27 @@ public:
         rlEnableBackfaceCulling();
     }
 
-    void draw_nodes(const std::span<path_planner_rrt_star::node_t> nodes, path_planner_rrt_star::node_t goal_node) const {
-while (goal_node.parent != nullptr) {
-            const auto& parent = *goal_node.parent;
-            DrawModel(model_node, {goal_node.position.x, 0.0f, goal_node.position.y}, 3.0f, GREEN);
-
-            DrawLine3D(Vector3{goal_node.position.x, 0.0f, goal_node.position.y},
-                    Vector3{parent.position.x, 0.0f, parent.position.y},
-                    GREEN);
-
-            goal_node = parent;
-        }
-
-        // for (std::size_t i = 0; i < nodes.size(); ++i) {
-        //     const auto node_t = nodes[i];
-        //     if (node_t.parent == nullptr) continue;
-
-        //     const auto parent = *node_t.parent;
-        //     DrawModel(model_node, {node_t.position.x, 0.0f, node_t.position.y}, 0.2f, PURPLE);  
-
-        //     DrawLine3D(Vector3{node_t.position.x, 0.0f, node_t.position.y},
-        //             Vector3{parent.position.x, 0.0f, parent.position.y},
-        //             PURPLE);
-        // }
+    void draw_path(const DubinsPath& path) const {
+        auto traj = sample_path_to_end(path);
+        draw_traj_simple(traj, 0.0f, PURPLE);
     }
 
-    void draw_nodes(const std::span<path_planner_rrt_star_dubins::node_t> nodes,  real_t rho) const {
+    void draw_nodes(const std::span<const rrtstar_dubins::node_t> nodes,  real_t rho) const {
 
         for (std::size_t i = 0; i < nodes.size(); ++i) {
             const auto node = nodes[i];
-            if (node.parent == nullptr) continue;
-            const auto parent = *node.parent;
-            draw_path_smooth({parent.conf, node.conf}, rho, 0.0f, PURPLE);
+            draw_path(node.path);
         }
     }
 
-    void draw_goal_path(path_planner_rrt_star_dubins::node_t goal_node, real_t rho) const {
-        while (goal_node.parent != nullptr) {
-            const auto& parent = *goal_node.parent;
-            draw_path_smooth({parent.conf, goal_node.conf}, rho, 0.0f, GREEN);
-            goal_node = parent;
-        }
-    }
+    void draw_configuration(configuration_t conf) {
+        DrawModel(model_node, {(conf.x), 0.0f, (conf.y)}, 3.0f, BLUE);
 
-    void draw_configuration(configuration conf) {
-        DrawModel(model_node, {(conf.pos.x), 0.0f, (conf.pos.y)}, 3.0f, BLUE);
-
-        point p2 {std::cos(conf.angle), std::sin(conf.angle)};
+        point p2 {std::cos(conf.yaw), std::sin(conf.yaw)};
         p2 = scale(p2, 5.0f);
-        p2 = add(conf.pos, p2);
+        p2 = add(conf.get_point(), p2);
 
-        DrawLine3D(Vector3{conf.pos.x, 0.0f, conf.pos.y},
+        DrawLine3D(Vector3{conf.x, 0.0f, conf.y},
                 Vector3{p2.x, 0.0f, p2.y},
                 BLUE);
     }
@@ -83,15 +53,15 @@ while (goal_node.parent != nullptr) {
         }
     }
 
-    void draw_path_simple(const std::vector<configuration>& path, real_t height = 0.0f, Color color = BLUE) const {
-        for (std::size_t i = 0; i < path.size() - 1; ++i) {
-            DrawLine3D(Vector3{path[i].pos.x, height, path[i].pos.y},
-                    Vector3{path[i + 1].pos.x, height, path[i + 1].pos.y},
+    void draw_traj_simple(const trajectory_t& traj, real_t height = 0.0f, Color color = BLUE) const {
+        for (std::size_t i = 0; i < traj.size() - 1; ++i) {
+            DrawLine3D(Vector3{traj[i].x, height, traj[i].y},
+                    Vector3{traj[i + 1].x, height, traj[i + 1].y},
                     color);
         }
     }
 
-    void draw_path_smooth(const std::vector<configuration>& path, real_t rho, real_t height = 0.0f, Color color = BLUE) const {
+    void draw_traj_smooth(const trajectory_t& path, real_t rho, real_t height = 0.0f, Color color = BLUE) const {
         if (path.size() < 2) return;
 
         for (std::size_t i = 0; i < path.size() - 1; ++i) {
@@ -99,7 +69,14 @@ while (goal_node.parent != nullptr) {
             if (!path_opt) return;
             const auto path_smooth = sample_path_to_end(path_opt.value());
 
-            draw_path_simple(path_smooth, height, color);
+            draw_traj_simple(path_smooth, height, color);
+        }
+    }
+
+    void draw_paths(const std::vector<DubinsPath>& paths, real_t height = 0.0f, Color color = BLUE) const {
+        for (const auto& path : paths) {
+            auto traj = sample_path_to_end(path);
+            draw_traj_simple(traj, height, color);
         }
     }
 
