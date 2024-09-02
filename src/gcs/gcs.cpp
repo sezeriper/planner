@@ -1,43 +1,44 @@
+#include "ui.hpp"
+#include "field.hpp"
+
 #include <imgui_internal.h>
 #include <imgui.h>
+#include <raylib.h>
 #include <rlImGui.h>
 
-constexpr int SCREEN_WIDTH = 1280;
-constexpr int SCREEN_HEIGHT = 720;
-constexpr auto TITLE = "Pars - GCS";
-constexpr int FPS = 60;
-constexpr auto BG_COLOR = DARKGRAY;
+
+using namespace rota;
 
 
 int main() {
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, TITLE);
-    SetTargetFPS(FPS);
-    rlImGuiSetup(true);
-    // enable docking
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+    obstacles_t obstacles {
+        {{-10.0f, -10.0f}, 10.0f},
+        {{-10.0f, 10.0f}, 10.0f},
+        {{10.0f, -10.0f}, 10.0f},
+        {{10.0f, 10.0f}, 10.0f},
+        {{-20.0f, -20.0f}, 10.0f},
+        {{-20.0f, 20.0f}, 10.0f},
+        {{20.0f, -20.0f}, 10.0f},
+        {{20.0f, 20.0f}, 10.0f},
+    };
+
+    border_t border {
+        {-50.0f, -50.0f},
+        {50.0f, -50.0f},
+        {50.0f, 50.0f},
+        {-50.0f, 50.0f},
+    };
+
+    field_t field {border, obstacles};
+
+    ui_t ui(field);
+    
     bool is_first_run = true;
-
     while (!WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(BG_COLOR);
-        rlImGuiBegin();
-
-
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
-        ImGuiID dockspace_id = ImGui::GetID("Dockspace");
-        ImGui::DockSpaceOverViewport(dockspace_id, viewport, dockspace_flags);
-
-        ImGui::Begin("DockSpace Demo");
-        ImGui::End();
-
-        rlImGuiEnd();
-        EndDrawing();
+        ui.draw();
+        ui.get_input();
     }
-
-    rlImGuiShutdown();
-    CloseWindow();
 
     return 0;
 }

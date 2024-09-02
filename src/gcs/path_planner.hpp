@@ -1,37 +1,20 @@
 #pragma once
 
-#include "grid.hpp"
 #include "math.hpp"
+#include "field.hpp"
 #include "dubins/dubins.hpp"
 
 #include <nanoflann.hpp>
 #include <spdlog/spdlog.h>
 
 #include <random>
-#include <iostream>
-#include <utility>
 #include <tuple>
 #include <algorithm>
 #include <numbers>
-#include <stack>
 #include <cstdlib>
+#include <stack>
 
 namespace rota {
-
-struct configuration_t {
-    real_t x;
-    real_t y;
-    real_t yaw;
-
-    constexpr point get_point() const { return point{x, y}; }
-};
-
-constexpr bool operator==(configuration_t lhs, configuration_t rhs) {
-    return lhs.x == rhs.x && lhs.y == rhs.y && lhs.yaw == rhs.yaw;
-}
-
-using trajectory_t = std::vector<configuration_t>;
-
 template <
     class T, class DataSource, typename _DistanceType = T,
     typename IndexType = uint32_t>
@@ -79,7 +62,7 @@ struct point_cloud {
     // Must return the number of data points
     inline size_t kdtree_get_point_count() const { return points.size(); }
 
-    // Returns the dim'th component of the idx'th point in the class:
+    // Returns the dim'th component of the idx'th vec2_t in the class:
     // Since this is inlined and the "dim" argument is typically an immediate
     // value, the
     //  "if/else's" are actually solved at compile time.
@@ -97,7 +80,7 @@ struct point_cloud {
     // bbox computation loop.
     //   Return true if the BBOX was already computed by the class and returned
     //   in "bb" so it can be avoided to redo it again. Look at bb.size() to
-    //   find out the expected dimensionality (e.g. 2 or 3 for point clouds)
+    //   find out the expected dimensionality (e.g. 2 or 3 for vec2_t clouds)
     template <class BBOX>
     bool kdtree_get_bbox(BBOX& /* bb */) const
     {
@@ -111,87 +94,17 @@ struct point_cloud {
     }
 };
 
-static std::optional<DubinsPath> find_path(const configuration_t from, const configuration_t to, real_t rho) {
-    DubinsPath path;
-
-    bool result = dubins_shortest_path(path, &from.x, &to.x, rho);
-    if (result == 0) {
-        return path;
-    }
-    return std::nullopt;
-}
-
-static real_t find_path_length(const configuration_t from, const configuration_t to, real_t rho) {
-    const auto path_opt = find_path(from, to, rho);
-    if (!path_opt) return std::numeric_limits<real_t>::max();
-    const auto path = path_opt.value();
-    return dubins_path_length(path);
-}
-
-static trajectory_t sample_path_to_end(const DubinsPath& path, real_t interval = 0.1f) {
-    trajectory_t path_points;
-
-    real_t q[3];
-    real_t length = dubins_path_length(path);
-    for (real_t t = 0.0f; t < length; t += interval) {
-        int result = dubins_path_sample(path, t, q);
-        path_points.push_back({ q[0], q[1], q[2] });
-    }
-
-    dubins_path_endpoint(path, q);
-    path_points.push_back({ q[0], q[1], q[2] });
-
-    return path_points;
-}
-
-static trajectory_t sample_path_to_length(const DubinsPath& path, real_t length, real_t interval = 0.1f) {
-    trajectory_t path_points;
-
-    real_t path_length = dubins_path_length(path);
-
-    if ((path_length - length) < 0.0f) {
-        return sample_path_to_end(path, interval);
-    }
-
-    real_t q[3];
-    for (real_t t = 0.0f; t < length; t += interval) {
-        int result = dubins_path_sample(path, t, q);
-        path_points.push_back({ q[0], q[1], q[2] });
-    }
-
-    dubins_path_sample(path, length - EPSILON, q);
-    path_points.push_back({ q[0], q[1], q[2] });
-
-    return path_points;
-}
-
-constexpr trajectory_t sample_paths(const std::vector<DubinsPath>& paths, real_t interval = 0.1f) {
-    trajectory_t path_points;
-
-    for (const auto& path : paths) {
-        const auto points = sample_path_to_end(path, interval);
-        path_points.insert(path_points.end(), points.begin(), points.end());
-    }
-
-    return path_points;
-}
-
 class path_planner {
 public:
-    struct obstacle {
-        point position;
-        real_t radius;
-    };
-
     path_planner() = delete;
 
     path_planner(
-        point start,
-        point goal,
+        vec2_t start,
+        vec2_t goal,
         real_t step_size,
         real_t goal_radius,
-        const std::vector<point>& border,
-        const std::vector<obstacle>& obstacles
+        const std::vector<vec2_t>& border,
+        const std::vector<obstacle_t>& obstacles
     ) :
         start(start),
         goal(goal),
@@ -207,73 +120,73 @@ public:
     {}
 
 protected:
-    const point start;
-    const point goal;
+    const vec2_t start;
+    const vec2_t goal;
     const real_t step_size;
     const real_t goal_radius;
-    const std::vector<point> border;
-    const std::vector<obstacle> obstacles;
-    const point border_min;
-    const point border_max;
+    const std::vector<vec2_t> border;
+    const std::vector<obstacle_t> obstacles;
+    const vec2_t border_min;
+    const vec2_t border_max;
     std::uniform_real_distribution<real_t> dis_real;
     std::uniform_int_distribution<int> dis_int;
     std::mt19937 gen;
 
-    constexpr bool is_colliding(const point& point) const {
-        if(!is_inside(point, border))
+    constexpr bool is_colliding(const vec2_t& vec2_t) const {
+        if(!is_inside(vec2_t, border))
             return true;
 
-        for (const auto& obstacle : obstacles) {
-            if (distance_sqr(point, obstacle.position) < (obstacle.radius * obstacle.radius)) {
+        for (const auto& obstacle_t : obstacles) {
+            if (distance_sqr(vec2_t, obstacle_t.position) < (obstacle_t.radius * obstacle_t.radius)) {
                 return true;
             }
         }
         return false;
     }
 
-    constexpr int get_rand_int(int start, int end) {
+    int get_rand_int(int start, int end) {
         dis_int.param(std::uniform_int_distribution<int>::param_type(start, end));
         return dis_int(gen);
     }
 
-    constexpr real_t get_rand_real() { return dis_real(gen); }
+    real_t get_rand_real() { return dis_real(gen); }
 
-    constexpr real_t get_rand_between(real_t start, real_t end) {
+    real_t get_rand_between(real_t start, real_t end) {
         return (get_rand_real() * (end - start)) + start;
     }
 
-    constexpr real_t get_rand_angle() { return get_rand_between(0.0f, std::numbers::pi_v<real_t> * 2.0f); }
+    real_t get_rand_angle() { return get_rand_between(0.0f, std::numbers::pi_v<real_t> * 2.0f); }
 
-    constexpr point get_rand_point() {
-        return {get_rand_point_x(), get_rand_point_y()};
+    vec2_t get_rand_vec2_t() {
+        return {get_rand_vec2_t_x(), get_rand_vec2_t_y()};
     }
 
-    constexpr real_t get_rand_point_x() {
+    real_t get_rand_vec2_t_x() {
         return get_rand_between(border_min.x, border_max.x);
     }
 
-    constexpr real_t get_rand_point_y() {
+    real_t get_rand_vec2_t_y() {
         return get_rand_between(border_min.y, border_max.y);
     }
 
 private:
-    constexpr point find_border_min() const {
-        point min {std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
+    constexpr vec2_t find_border_min() const {
+        vec2_t min {std::numeric_limits<real_t>::max(), std::numeric_limits<real_t>::max()};
 
-        for (const auto& point : border) {
-            if (point.x < min.x) min.x = point.x;
-            if (point.y < min.y) min.y = point.y;
+        for (const auto& vec2_t : border) {
+            if (vec2_t.x < min.x) min.x = vec2_t.x;
+            if (vec2_t.y < min.y) min.y = vec2_t.y;
         }
 
         return min;
     }
 
-    constexpr point find_border_max() const {
-        point max {std::numeric_limits<real_t>::min(), std::numeric_limits<real_t>::min()};
+    constexpr vec2_t find_border_max() const {
+        vec2_t max {std::numeric_limits<real_t>::min(), std::numeric_limits<real_t>::min()};
 
-        for (const auto& point : border) {
-            if (point.x > max.x) max.x = point.x;
-            if (point.y > max.y) max.y = point.y;
+        for (const auto& vec2_t : border) {
+            if (vec2_t.x > max.x) max.x = vec2_t.x;
+            if (vec2_t.y > max.y) max.y = vec2_t.y;
         }
 
         return max;
@@ -305,8 +218,8 @@ public:
         real_t goal_radius,
         real_t near_radius,
         real_t rho,
-        const std::vector<point>& border,
-        const std::vector<obstacle>& obstacles
+        const std::vector<vec2_t>& border,
+        const std::vector<obstacle_t>& obstacles
     ) :
         path_planner(start.get_point(), goal.get_point(), step_size, goal_radius, border, obstacles),
         rho{rho},
@@ -435,7 +348,7 @@ private:
     }
 
     std::tuple<const node_t*, node_list_t> add_node() {
-        configuration_t rand_conf {get_rand_point_x(), get_rand_point_y(), get_rand_angle()};
+        configuration_t rand_conf {get_rand_vec2_t_x(), get_rand_vec2_t_y(), get_rand_angle()};
         if (path_planner::is_colliding(rand_conf.get_point())) return {};
 
         const node_t* nearest = nearest_node(rand_conf);

@@ -69,12 +69,12 @@ int main() {
     air_control_client ac(
         grpc::CreateChannel("localhost:1923", grpc::InsecureChannelCredentials()));
 
-    point_t* point = new point_t;
-    point->set_x(0.0f);
-    point->set_y(0.0f);
+    vec2_t_t* vec2_t = new vec2_t_t;
+    vec2_t->set_x(0.0f);
+    vec2_t->set_y(0.0f);
 
     configuration_t conf;
-    conf.set_allocated_position(point);
+    conf.set_allocated_position(vec2_t);
     conf.set_yaw(90.0f);
 
     std::vector<configuration_t> trajectory{conf};

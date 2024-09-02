@@ -11,7 +11,7 @@
             "preLaunchTask": "build-debug",
             "program": "${workspaceFolder}/build/gcs",
             "args": [],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build",
             "console": "integratedTerminal"
         },
         {
@@ -21,7 +21,7 @@
             "preLaunchTask": "build-release",
             "program": "${workspaceFolder}/build/gcs",
             "args": [],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build",
             "console": "integratedTerminal"
         },
         {
@@ -31,7 +31,7 @@
             "preLaunchTask": "build-relwithdeb",
             "program": "${workspaceFolder}/build/gcs",
             "args": [],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build",
             "console": "integratedTerminal"
         }
     ]

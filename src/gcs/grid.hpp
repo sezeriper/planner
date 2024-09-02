@@ -3,6 +3,7 @@
 #include "math.hpp"
 
 #include <span>
+#include <memory>
 
 namespace rota {
 
@@ -73,7 +74,7 @@ public:
 
     grid_spatial() = delete;
 
-    grid_spatial(point top_left, point bottom_right, real_t cell_size, int capacity) :
+    grid_spatial(vec2_t top_left, vec2_t bottom_right, real_t cell_size, int capacity) :
         grid<data_t>(
             ((bottom_right.x - top_left.x) / cell_size) + 1,
             ((bottom_right.y - top_left.y) / cell_size) + 1,
@@ -88,27 +89,27 @@ public:
         return _cell_size;
     }
 
-    constexpr point get_top_left() const {
+    constexpr vec2_t get_top_left() const {
         return _top_left;
     }
 
-    constexpr point get_bottom_right() const {
+    constexpr vec2_t get_bottom_right() const {
         return _bottom_right;
     }
 
-    constexpr coord get_coord(point p) const {
+    constexpr coord get_coord(vec2_t p) const {
         size_t x = (p.x - _top_left.x) / _cell_size;
         size_t y = (p.y - _top_left.y) / _cell_size;
         return {x, y};
     }
 
     using grid<data_t>::get_cell;
-    grid<data_t>::cell get_cell(point p) const {
+    grid<data_t>::cell get_cell(vec2_t p) const {
         coord c = get_coord(p);
         return grid<data_t>::get_cell(c.x, c.y);
     }
 
-    std::vector<typename grid<data_t>::cell> get_cells_in_radius(point p, real_t radius) const {
+    std::vector<typename grid<data_t>::cell> get_cells_in_radius(vec2_t p, real_t radius) const {
         std::vector<typename grid<data_t>::cell> cells;
 
         const coord c = get_coord(p);
@@ -131,14 +132,14 @@ public:
     }
 
     using grid<data_t>::add_data;
-    data_t& add_data(point p, const data_t& data) {
+    data_t& add_data(vec2_t p, const data_t& data) {
         coord c = get_coord(p);
         return grid<data_t>::add_data(c.x, c.y, data);
     }
 
 private:
-    point _top_left;
-    point _bottom_right;
+    vec2_t _top_left;
+    vec2_t _bottom_right;
     real_t _cell_size;
 };
 }

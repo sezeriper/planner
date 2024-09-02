@@ -1,24 +1,35 @@
 #pragma once
 
-#include <span>
+#include "field.hpp"
+#include "dubins/dubins.hpp"
+#include "path_planner.hpp"
+#include "grid.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
-
-#include "path_planner.hpp"
 
 namespace rota {
 
 class visualizer {
 public:
-    visualizer(const std::vector<point>& border_points) {
-        model_border = gen_model_border(border_points);
+
+    void init(field_t field) {
+        model_border = gen_model_border(field.border);
         model_node = LoadModelFromMesh(GenMeshSphere(0.25f, 4, 8));
+
+        for (const auto& obstacle : field.obstacles) {
+            model_obstacles.push_back(LoadModelFromMesh(GenMeshCylinder(obstacle.radius, 5.0f, 32)));
+        }
+    }
+
+    void draw_field(const field_t& field) const {
+        draw_border();
+        draw_obstacles(field.obstacles);
     }
 
     void draw_border() const {
         rlDisableBackfaceCulling();
-        DrawModel(model_border, {0.0f, 0.0f, 0.0f}, 1.0f, RED);
+        DrawModel(model_border, {0.0f, 0.0f, 0.0f}, 1.0f, BLACK);
         rlEnableBackfaceCulling();
     }
 
@@ -38,7 +49,7 @@ public:
     void draw_configuration(configuration_t conf) {
         DrawModel(model_node, {(conf.x), 0.0f, (conf.y)}, 3.0f, BLUE);
 
-        point p2 {std::cos(conf.yaw), std::sin(conf.yaw)};
+        vec2_t p2 {std::cos(conf.yaw), std::sin(conf.yaw)};
         p2 = scale(p2, 5.0f);
         p2 = add(conf.get_point(), p2);
 
@@ -47,9 +58,9 @@ public:
                 BLUE);
     }
 
-    void draw_obstacles(const std::vector<path_planner::obstacle>& obstacles) const {
+    void draw_obstacles(const obstacles_t& obstacles) const {
         for (const auto& obstacle : obstacles) {
-            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius - 2.0f, 5.0f, 32, BLACK);
+            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius, 5.0f, 32, BLACK);
         }
     }
 
@@ -85,7 +96,7 @@ public:
         real_t w = g.get_width();
         real_t h = g.get_height();
         real_t cell_size = g.get_cell_size();
-        point tl = g.get_top_left();
+        vec2_t tl = g.get_top_left();
 
         for (real_t i = 0.0f; i <= w; ++i) {
             Vector3 start {tl.x + i * cell_size, 0.0f, tl.y};
@@ -101,41 +112,45 @@ public:
     }
 
 private:
-    Mesh gen_mesh_border(const std::vector<point>& points) {
+    Model model_border;
+    Model model_node;
+    std::vector<Model> model_obstacles;
+
+    Mesh gen_mesh_border(const std::vector<vec2_t>& vec2_ts) {
         Mesh mesh{};
 
-        mesh.triangleCount = points.size() * 2;
+        mesh.triangleCount = vec2_ts.size() * 2;
         mesh.vertexCount = mesh.triangleCount * 3;
 
         mesh.vertices = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
         mesh.normals  = (float *)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
 
-        for (std::size_t i = 0; i < points.size(); ++i) {
-            std::size_t next_idx = (i + 1) % points.size();
+        for (std::size_t i = 0; i < vec2_ts.size(); ++i) {
+            std::size_t next_idx = (i + 1) % vec2_ts.size();
 
-            mesh.vertices[i * 18] = points[i].x;
+            mesh.vertices[i * 18] = vec2_ts[i].x;
             mesh.vertices[i * 18 + 1] = 0.0f;
-            mesh.vertices[i * 18 + 2] = points[i].y;
+            mesh.vertices[i * 18 + 2] = vec2_ts[i].y;
 
-            mesh.vertices[i * 18 + 3] = points[i].x;
+            mesh.vertices[i * 18 + 3] = vec2_ts[i].x;
             mesh.vertices[i * 18 + 4] = 5.0f;
-            mesh.vertices[i * 18 + 5] = points[i].y;
+            mesh.vertices[i * 18 + 5] = vec2_ts[i].y;
 
-            mesh.vertices[i * 18 + 6] = points[next_idx].x;
+            mesh.vertices[i * 18 + 6] = vec2_ts[next_idx].x;
             mesh.vertices[i * 18 + 7] = 5.0f;
-            mesh.vertices[i * 18 + 8] = points[next_idx].y;
+            mesh.vertices[i * 18 + 8] = vec2_ts[next_idx].y;
 
-            mesh.vertices[i * 18 + 9] = points[next_idx].x;
+            mesh.vertices[i * 18 + 9] = vec2_ts[next_idx].x;
             mesh.vertices[i * 18 + 10] = 5.0f;
-            mesh.vertices[i * 18 + 11] = points[next_idx].y;
+            mesh.vertices[i * 18 + 11] = vec2_ts[next_idx].y;
 
-            mesh.vertices[i * 18 + 12] = points[next_idx].x;
+            mesh.vertices[i * 18 + 12] = vec2_ts[next_idx].x;
             mesh.vertices[i * 18 + 13] = 0.0f;
-            mesh.vertices[i * 18 + 14] = points[next_idx].y;
+            mesh.vertices[i * 18 + 14] = vec2_ts[next_idx].y;
 
-            mesh.vertices[i * 18 + 15] = points[i].x;
+            mesh.vertices[i * 18 + 15] = vec2_ts[i].x;
             mesh.vertices[i * 18 + 16] = 0.0f;
-            mesh.vertices[i * 18 + 17] = points[i].y;
+            mesh.vertices[i * 18 + 17] = vec2_ts[i].y;
         }
 
         UploadMesh(&mesh, false);
@@ -143,14 +158,11 @@ private:
         return mesh;
     }
 
-    Model gen_model_border(const std::vector<point>& points) {
-        Model border = LoadModelFromMesh(gen_mesh_border(points));
+    Model gen_model_border(const std::vector<vec2_t>& vec2_ts) {
+        Model border = LoadModelFromMesh(gen_mesh_border(vec2_ts));
         border.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
 
         return border;
     }
-    
-    Model model_border;
-    Model model_node;
 };
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30.2)
+cmake_minimum_required(VERSION 3.28.2)
 project(mission_control)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -24,7 +24,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   rlimgui
   GIT_REPOSITORY https://github.com/raylib-extras/rlImGui.git
-  GIT_TAG origin/main
+  GIT_TAG 57efef06f69b50ed9ac0834a963a8aefcc59d588
   GIT_PROGRESS TRUE
 )
 
@@ -67,6 +67,8 @@ if (APPLE)
     target_link_libraries(gcs "-framework Cocoa")
     target_link_libraries(gcs "-framework OpenGL")
 endif()
+
+file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
 
 add_executable(air src/air/air.cpp)
 target_link_libraries(air ac_grpc_proto spdlog)

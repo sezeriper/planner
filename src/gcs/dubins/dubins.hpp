@@ -22,10 +22,7 @@
 #ifndef DUBINS_H
 #define DUBINS_H
 
-#include "../math.hpp"
-using namespace rota;
-
-constexpr real_t EPSILON = 10e-10;
+constexpr float EPSILON = 10e-10;
 
 enum DubinsPathType : int
 {
@@ -40,11 +37,11 @@ enum DubinsPathType : int
 typedef struct 
 {
     /* the initial configuration */
-    real_t qi[3];
+    float qi[3];
     /* the lengths of the three segments */
-    real_t param[3];
+    float param[3];
     /* model forward velocity / model angular velocity */
-    real_t rho;
+    float rho;
     /* the path type described */
     DubinsPathType type; 
 } DubinsPath;
@@ -63,7 +60,7 @@ typedef struct
  * @note the user_data parameter is forwarded from the caller
  * @note return non-zero to denote sampling should be stopped
  */
-typedef int (*DubinsPathSamplingCallback)(real_t q[3], real_t t, void* user_data);
+typedef int (*DubinsPathSamplingCallback)(float q[3], float t, void* user_data);
 
 /**
  * Generate a path from an initial configuration to
@@ -79,7 +76,7 @@ typedef int (*DubinsPathSamplingCallback)(real_t q[3], real_t t, void* user_data
  * @param rho   - turning radius of the vehicle (forward velocity divided by maximum angular velocity)
  * @return      - non-zero on error
  */
-int dubins_shortest_path(DubinsPath& path, const real_t q0[3], const real_t q1[3], real_t rho);
+int dubins_shortest_path(DubinsPath& path, const float q0[3], const float q1[3], float rho);
 
 /**
  * Generate a path with a specified word from an initial configuration to
@@ -92,14 +89,14 @@ int dubins_shortest_path(DubinsPath& path, const real_t q0[3], const real_t q1[3
  * @param pathType - the specific path type to use
  * @return         - non-zero on error
  */
-int dubins_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho, DubinsPathType pathType);
+int dubins_path(DubinsPath& path, float q0[3], float q1[3], float rho, DubinsPathType pathType);
 
 /**
  * Calculate the length of an initialised path
  *
  * @param path - the path to find the length of
  */
-real_t dubins_path_length(const DubinsPath& path);
+float dubins_path_length(const DubinsPath& path);
 
 /**
  * Return the length of a specific segment in an initialized path
@@ -107,7 +104,7 @@ real_t dubins_path_length(const DubinsPath& path);
  * @param path - the path to find the length of
  * @param i    - the segment you to get the length of (0-2)
  */
-real_t dubins_segment_length(const DubinsPath& path, int i);
+float dubins_segment_length(const DubinsPath& path, int i);
 
 /**
  * Return the normalized length of a specific segment in an initialized path
@@ -115,7 +112,7 @@ real_t dubins_segment_length(const DubinsPath& path, int i);
  * @param path - the path to find the length of
  * @param i    - the segment you to get the length of (0-2)
  */
-real_t dubins_segment_length_normalized( const DubinsPath& path, int i );
+float dubins_segment_length_normalized( const DubinsPath& path, int i );
 
 /**
  * Extract an integer that represents which path type was used
@@ -133,7 +130,7 @@ DubinsPathType dubins_path_type(const DubinsPath& path);
  * @param q    - the configuration result
  * @returns    - non-zero if 't' is not in the correct range
  */
-int dubins_path_sample(const DubinsPath& path, real_t t, real_t q[3]);
+int dubins_path_sample(const DubinsPath& path, float t, float q[3]);
 
 /**
  * Walk along the path at a fixed sampling interval, calling the
@@ -149,17 +146,17 @@ int dubins_path_sample(const DubinsPath& path, real_t t, real_t q[3]);
  * @returns - zero on successful completion, or the result of the callback
  */
 int dubins_path_sample_many(const DubinsPath& path, 
-                            real_t stepSize, 
+                            float stepSize, 
                             DubinsPathSamplingCallback cb, 
                             void* user_data);
 
 /**
- * Convenience function to identify the endpoint of a path
+ * Convenience function to identify the endvec2_t of a path
  *
  * @param path - an initialised path
  * @param q    - the configuration result
  */
-int dubins_path_endpoint(const DubinsPath& path, real_t q[3]);
+int dubins_path_endvec2_t(const DubinsPath& path, float q[3]);
 
 /**
  * Convenience function to extract a subset of a path
@@ -168,7 +165,7 @@ int dubins_path_endpoint(const DubinsPath& path, real_t q[3]);
  * @param t       - a length measure, where 0 < t < dubins_path_length(path)
  * @param newpath - the resultant path
  */
-int dubins_extract_subpath(const DubinsPath& path, real_t t, DubinsPath* newpath);
+int dubins_extract_subpath(const DubinsPath& path, float t, DubinsPath* newpath);
 
 #endif /* DUBINS_H */
 

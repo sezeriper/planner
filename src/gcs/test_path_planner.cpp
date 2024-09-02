@@ -12,7 +12,6 @@
 
 #include <memory>
 #include <chrono>
-#include <numbers>
 
 using namespace rota;
 
@@ -26,7 +25,7 @@ std::vector<path_planner::obstacle> gen_obstacles(std::size_t num)
     obstacles.reserve(num);
 
     for (std::size_t i = 0; i < num; ++i) {
-        point position{dis_uni(gen), dis_uni(gen)};
+        vec2_t position{dis_uni(gen), dis_uni(gen)};
         float radius = dis_nor(gen);
 
         obstacles.push_back(path_planner::obstacle{position, radius});
@@ -45,18 +44,18 @@ int main() {
 
     rlImGuiSetup(true);
 
-    std::vector<point> border_points {
+    std::vector<vec2_t> border_vec2_ts {
         {-50.0f, -50.0f},
         {50.0f, -50.0f},
         {50.0f, 50.0f},
         {-50.0f, 50.0f},
     };
 
-    auto vis = visualizer(border_points);
+    auto vis = visualizer(border_vec2_ts);
 
     constexpr int NUM_OBSTACLES = 8;
     // auto obstacles = gen_obstacles(NUM_OBSTACLES);
-    std::vector<path_planner::obstacle> obstacles {
+    std::vector<obstacle_t> obstacles {
         {{-10.0f, -10.0f}, 10.0f},
         {{-10.0f, 10.0f}, 10.0f},
         {{10.0f, -10.0f}, 10.0f},
@@ -74,7 +73,7 @@ int main() {
     real_t STEP_SIZE = 8.0f;
     real_t NEAR_RADIUS = 16.0f;
     real_t GOAL_RADIUS = 16.0f;
-    auto planner = std::make_unique<rrtstar_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
+    auto planner = std::make_unique<rrtstar_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_vec2_ts, obstacles);
 
     camera cam;
 
@@ -135,7 +134,7 @@ int main() {
         EndDrawing();
 
         if (IsKeyPressed(KEY_SPACE) || do_reset) {
-            planner = std::make_unique<rrtstar_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_points, obstacles);
+            planner = std::make_unique<rrtstar_dubins>(start, goal, STEP_SIZE, GOAL_RADIUS, NEAR_RADIUS, RHO, border_vec2_ts, obstacles);
         }
 
         if (IsKeyPressed(KEY_ENTER) || do_sample) {

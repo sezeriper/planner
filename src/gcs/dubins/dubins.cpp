@@ -22,10 +22,15 @@
 #ifdef WIN32
 #define _USE_MATH_DEFINES
 #endif
+
 #include <math.h>
 #include "dubins.hpp"
 #include <numbers>
-#include <limits>
+
+constexpr float PI = std::numbers::pi_v<float>;
+constexpr float TWO_PI = 2.0f * PI;
+constexpr float INF = std::numeric_limits<float>::max();
+
 
 typedef enum 
 {
@@ -46,43 +51,43 @@ constexpr SegmentType DIRDATA[][3] = {
 
 typedef struct 
 {
-    real_t alpha;
-    real_t beta;
-    real_t d;
-    real_t sa;
-    real_t sb;
-    real_t ca;
-    real_t cb;
-    real_t c_ab;
-    real_t d_sq;
+    float alpha;
+    float beta;
+    float d;
+    float sa;
+    float sb;
+    float ca;
+    float cb;
+    float c_ab;
+    float d_sq;
 } DubinsIntermediateResults;
 
 
-int dubins_word(DubinsIntermediateResults* in, DubinsPathType pathType, real_t out[3]);
-int dubins_intermediate_results(DubinsIntermediateResults* in, const real_t q0[3], const real_t q1[3], real_t rho);
+int dubins_word(DubinsIntermediateResults* in, DubinsPathType pathType, float out[3]);
+int dubins_intermediate_results(DubinsIntermediateResults* in, const float q0[3], const float q1[3], float rho);
 
 /**
- * Floating point modulus suitable for rings
+ * Floating vec2_t modulus suitable for rings
  *
  * fmod doesn't behave correctly for angular quantities, this function does
  */
-constexpr real_t fmodr(real_t x, real_t y)
+constexpr float fmodr(float x, float y)
 {
     return x - y * std::floor(x/y);
 }
 
-constexpr real_t mod2pi(real_t theta)
+constexpr float mod2pi(float theta)
 {
     return fmodr(theta, 2.0f * PI);
 }
 
-int dubins_shortest_path(DubinsPath& path, const real_t q0[3], const real_t q1[3], real_t rho)
+int dubins_shortest_path(DubinsPath& path, const float q0[3], const float q1[3], float rho)
 {
     int i, errcode;
     DubinsIntermediateResults in;
-    real_t params[3];
-    real_t cost;
-    real_t best_cost = INF;
+    float params[3];
+    float cost;
+    float best_cost = INF;
     int best_word = -1;
     errcode = dubins_intermediate_results(&in, q0, q1, rho);
     if(errcode != EDUBOK) {
@@ -115,13 +120,13 @@ int dubins_shortest_path(DubinsPath& path, const real_t q0[3], const real_t q1[3
     return EDUBOK;
 }
 
-int dubins_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho, DubinsPathType pathType)
+int dubins_path(DubinsPath& path, float q0[3], float q1[3], float rho, DubinsPathType pathType)
 {
     int errcode;
     DubinsIntermediateResults in;
     errcode = dubins_intermediate_results(&in, q0, q1, rho);
     if(errcode == EDUBOK) {
-        real_t params[3];
+        float params[3];
         errcode = dubins_word(&in, pathType, params);
         if(errcode == EDUBOK) {
             path.param[0] = params[0];
@@ -137,9 +142,9 @@ int dubins_path(DubinsPath& path, real_t q0[3], real_t q1[3], real_t rho, Dubins
     return errcode;
 }
 
-real_t dubins_path_length( const DubinsPath& path )
+float dubins_path_length( const DubinsPath& path )
 {
-    real_t length = 0.0f;
+    float length = 0.0f;
     length += path.param[0];
     length += path.param[1];
     length += path.param[2];
@@ -147,7 +152,7 @@ real_t dubins_path_length( const DubinsPath& path )
     return length;
 }
 
-real_t dubins_segment_length( const DubinsPath& path, int i )
+float dubins_segment_length( const DubinsPath& path, int i )
 {
     if( (i < 0) || (i > 2) )
     {
@@ -156,7 +161,7 @@ real_t dubins_segment_length( const DubinsPath& path, int i )
     return path.param[i] * path.rho;
 }
 
-real_t dubins_segment_length_normalized( const DubinsPath& path, int i )
+float dubins_segment_length_normalized( const DubinsPath& path, int i )
 {
     if( (i < 0) || (i > 2) )
     {
@@ -170,10 +175,10 @@ DubinsPathType dubins_path_type( const DubinsPath& path )
     return path.type;
 }
 
-void dubins_segment( real_t t, real_t qi[3], real_t qt[3], SegmentType type)
+void dubins_segment( float t, float qi[3], float qt[3], SegmentType type)
 {
-    real_t st = std::sin(qi[2]);
-    real_t ct = std::cos(qi[2]);
+    float st = std::sin(qi[2]);
+    float ct = std::cos(qi[2]);
     if( type == L_SEG ) {
         qt[0] = +std::sin(qi[2]+t) - st;
         qt[1] = -std::cos(qi[2]+t) + ct;
@@ -194,15 +199,15 @@ void dubins_segment( real_t t, real_t qi[3], real_t qt[3], SegmentType type)
     qt[2] += qi[2];
 }
 
-int dubins_path_sample( const DubinsPath& path, real_t t, real_t q[3] )
+int dubins_path_sample( const DubinsPath& path, float t, float q[3] )
 {
     /* tprime is the normalised variant of the parameter t */
-    real_t tprime = t / path.rho;
-    real_t qi[3]; /* The translated initial configuration */
-    real_t q1[3]; /* end-of segment 1 */
-    real_t q2[3]; /* end-of segment 2 */
+    float tprime = t / path.rho;
+    float qi[3]; /* The translated initial configuration */
+    float q1[3]; /* end-of segment 1 */
+    float q2[3]; /* end-of segment 2 */
     const SegmentType* types = DIRDATA[path.type];
-    real_t p1, p2;
+    float p1, p2;
 
     if( t < 0.0f || t > dubins_path_length(path) ) {
         return EDUBPARAM;
@@ -228,7 +233,7 @@ int dubins_path_sample( const DubinsPath& path, real_t t, real_t q[3] )
         dubins_segment( tprime-p1-p2, q2, q,  types[2] );
     }
 
-    /* scale the target configuration, translate back to the original starting point */
+    /* scale the target configuration, translate back to the original starting vec2_t */
     q[0] = q[0] * path.rho + path.qi[0];
     q[1] = q[1] * path.rho + path.qi[1];
     q[2] = mod2pi(q[2]);
@@ -236,13 +241,13 @@ int dubins_path_sample( const DubinsPath& path, real_t t, real_t q[3] )
     return EDUBOK;
 }
 
-int dubins_path_sample_many(const DubinsPath& path, real_t stepSize, 
+int dubins_path_sample_many(const DubinsPath& path, float stepSize, 
                             DubinsPathSamplingCallback cb, void* user_data)
 {
     int retcode;
-    real_t q[3];
-    real_t x = 0.0f;
-    real_t length = dubins_path_length(path);
+    float q[3];
+    float x = 0.0f;
+    float length = dubins_path_length(path);
     while( x <  length ) {
         dubins_path_sample( path, x, q );
         retcode = cb(q, x, user_data);
@@ -254,15 +259,15 @@ int dubins_path_sample_many(const DubinsPath& path, real_t stepSize,
     return 0;
 }
 
-int dubins_path_endpoint( const DubinsPath& path, real_t q[3] )
+int dubins_path_endvec2_t( const DubinsPath& path, float q[3] )
 {
     return dubins_path_sample( path, dubins_path_length(path) - EPSILON, q );
 }
 
-int dubins_extract_subpath( const DubinsPath& path, real_t t, DubinsPath* newpath )
+int dubins_extract_subpath( const DubinsPath& path, float t, DubinsPath* newpath )
 {
     /* calculate the true parameter */
-    real_t tprime = t / path.rho;
+    float tprime = t / path.rho;
 
     if((t < 0.0f) || (t > dubins_path_length(path)))
     {
@@ -283,9 +288,9 @@ int dubins_extract_subpath( const DubinsPath& path, real_t t, DubinsPath* newpat
     return 0;
 }
 
-int dubins_intermediate_results(DubinsIntermediateResults* in, const real_t q0[3], const real_t q1[3], real_t rho)
+int dubins_intermediate_results(DubinsIntermediateResults* in, const float q0[3], const float q1[3], float rho)
 {
-    real_t dx, dy, D, d, theta, alpha, beta;
+    float dx, dy, D, d, theta, alpha, beta;
     if(rho <= 0.0f) {
         return EDUBBADRHO;
     }
@@ -316,9 +321,9 @@ int dubins_intermediate_results(DubinsIntermediateResults* in, const real_t q0[3
     return EDUBOK;
 }
 
-int dubins_LSL(DubinsIntermediateResults* in, real_t out[3]) 
+int dubins_LSL(DubinsIntermediateResults* in, float out[3]) 
 {
-    real_t tmp0, tmp1, p_sq;
+    float tmp0, tmp1, p_sq;
     
     tmp0 = in->d + in->sa - in->sb;
     p_sq = 2.0f + in->d_sq - (2.0f * in->c_ab) + (2.0f * in->d * (in->sa - in->sb));
@@ -334,12 +339,12 @@ int dubins_LSL(DubinsIntermediateResults* in, real_t out[3])
 }
 
 
-int dubins_RSR(DubinsIntermediateResults* in, real_t out[3]) 
+int dubins_RSR(DubinsIntermediateResults* in, float out[3]) 
 {
-    real_t tmp0 = in->d - in->sa + in->sb;
-    real_t p_sq = 2.0f + in->d_sq - (2.0f * in->c_ab) + (2.0f * in->d * (in->sb - in->sa));
+    float tmp0 = in->d - in->sa + in->sb;
+    float p_sq = 2.0f + in->d_sq - (2.0f * in->c_ab) + (2.0f * in->d * (in->sb - in->sa));
     if( p_sq >= 0.0f ) {
-        real_t tmp1 = std::atan2( (in->ca - in->cb), tmp0 );
+        float tmp1 = std::atan2( (in->ca - in->cb), tmp0 );
         out[0] = mod2pi(in->alpha - tmp1);
         out[1] = std::sqrt(p_sq);
         out[2] = mod2pi(tmp1 -in->beta);
@@ -348,12 +353,12 @@ int dubins_RSR(DubinsIntermediateResults* in, real_t out[3])
     return EDUBNOPATH;
 }
 
-int dubins_LSR(DubinsIntermediateResults* in, real_t out[3]) 
+int dubins_LSR(DubinsIntermediateResults* in, float out[3]) 
 {
-    real_t p_sq = -2.0f + (in->d_sq) + (2.0f * in->c_ab) + (2.0f * in->d * (in->sa + in->sb));
+    float p_sq = -2.0f + (in->d_sq) + (2.0f * in->c_ab) + (2.0f * in->d * (in->sa + in->sb));
     if( p_sq >= 0.0f ) {
-        real_t p    = std::sqrt(p_sq);
-        real_t tmp0 = std::atan2( (-in->ca - in->cb), (in->d + in->sa + in->sb) ) - std::atan2(-2.0f, p);
+        float p    = std::sqrt(p_sq);
+        float tmp0 = std::atan2( (-in->ca - in->cb), (in->d + in->sa + in->sb) ) - std::atan2(-2.0f, p);
         out[0] = mod2pi(tmp0 - in->alpha);
         out[1] = p;
         out[2] = mod2pi(tmp0 - mod2pi(in->beta));
@@ -362,12 +367,12 @@ int dubins_LSR(DubinsIntermediateResults* in, real_t out[3])
     return EDUBNOPATH;
 }
 
-int dubins_RSL(DubinsIntermediateResults* in, real_t out[3]) 
+int dubins_RSL(DubinsIntermediateResults* in, float out[3]) 
 {
-    real_t p_sq = -2.0f + in->d_sq + (2.0f * in->c_ab) - (2.0f * in->d * (in->sa + in->sb));
+    float p_sq = -2.0f + in->d_sq + (2.0f * in->c_ab) - (2.0f * in->d * (in->sa + in->sb));
     if( p_sq >= 0.0f ) {
-        real_t p    = std::sqrt(p_sq);
-        real_t tmp0 = std::atan2( (in->ca + in->cb), (in->d - in->sa - in->sb) ) - std::atan2(2.0f, p);
+        float p    = std::sqrt(p_sq);
+        float tmp0 = std::atan2( (in->ca + in->cb), (in->d - in->sa - in->sb) ) - std::atan2(2.0f, p);
         out[0] = mod2pi(in->alpha - tmp0);
         out[1] = p;
         out[2] = mod2pi(in->beta - tmp0);
@@ -376,13 +381,13 @@ int dubins_RSL(DubinsIntermediateResults* in, real_t out[3])
     return EDUBNOPATH;
 }
 
-int dubins_RLR(DubinsIntermediateResults* in, real_t out[3]) 
+int dubins_RLR(DubinsIntermediateResults* in, float out[3]) 
 {
-    real_t tmp0 = (6.0f - in->d_sq + 2.0f*in->c_ab + 2.0f*in->d*(in->sa - in->sb)) / 8.0f;
-    real_t phi  = std::atan2( in->ca - in->cb, in->d - in->sa + in->sb );
+    float tmp0 = (6.0f - in->d_sq + 2.0f*in->c_ab + 2.0f*in->d*(in->sa - in->sb)) / 8.0f;
+    float phi  = std::atan2( in->ca - in->cb, in->d - in->sa + in->sb );
     if( std::fabs(tmp0) <= 1.0f) {
-        real_t p = mod2pi((2.0f*PI) - std::acos(tmp0) );
-        real_t t = mod2pi(in->alpha - phi + mod2pi(p/2.0f));
+        float p = mod2pi((2.0f*PI) - std::acos(tmp0) );
+        float t = mod2pi(in->alpha - phi + mod2pi(p/2.0f));
         out[0] = t;
         out[1] = p;
         out[2] = mod2pi(in->alpha - in->beta - t + mod2pi(p));
@@ -391,13 +396,13 @@ int dubins_RLR(DubinsIntermediateResults* in, real_t out[3])
     return EDUBNOPATH;
 }
 
-int dubins_LRL(DubinsIntermediateResults* in, real_t out[3])
+int dubins_LRL(DubinsIntermediateResults* in, float out[3])
 {
-    real_t tmp0 = (6.0f - in->d_sq + 2.0f*in->c_ab + 2.0f*in->d*(in->sb - in->sa)) / 8.0f;
-    real_t phi = std::atan2( in->ca - in->cb, in->d + in->sa - in->sb );
+    float tmp0 = (6.0f - in->d_sq + 2.0f*in->c_ab + 2.0f*in->d*(in->sb - in->sa)) / 8.0f;
+    float phi = std::atan2( in->ca - in->cb, in->d + in->sa - in->sb );
     if( std::fabs(tmp0) <= 1.0f) {
-        real_t p = mod2pi( 2.0f*PI - std::acos( tmp0) );
-        real_t t = mod2pi(-in->alpha - phi + p/2.0f);
+        float p = mod2pi( 2.0f*PI - std::acos( tmp0) );
+        float t = mod2pi(-in->alpha - phi + p/2.0f);
         out[0] = t;
         out[1] = p;
         out[2] = mod2pi(mod2pi(in->beta) - in->alpha -t + mod2pi(p));
@@ -406,7 +411,7 @@ int dubins_LRL(DubinsIntermediateResults* in, real_t out[3])
     return EDUBNOPATH;
 }
 
-int dubins_word(DubinsIntermediateResults* in, DubinsPathType pathType, real_t out[3]) 
+int dubins_word(DubinsIntermediateResults* in, DubinsPathType pathType, float out[3]) 
 {
     int result;
     switch(pathType)
