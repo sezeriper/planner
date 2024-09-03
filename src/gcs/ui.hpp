@@ -62,8 +62,8 @@ public:
 
         ImGuiWindowClass window_class;
         window_class.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoDockingOverMe | ImGuiDockNodeFlags_NoDockingOverOther | ImGuiDockNodeFlags_NoDockingSplit;
-        ImGui::SetNextWindowClass(&window_class);
 
+        ImGui::SetNextWindowClass(&window_class);
         ImGui::Begin("Field View");
 
         ImVec2 region = ImGui::GetContentRegionAvail();

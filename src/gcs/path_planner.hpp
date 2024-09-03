@@ -13,6 +13,7 @@
 #include <numbers>
 #include <cstdlib>
 #include <stack>
+#include <span>
 
 namespace rota {
 template <

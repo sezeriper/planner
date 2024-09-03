@@ -43,7 +43,28 @@ FetchContent_Declare(
   GIT_PROGRESS TRUE
 )
 
-FetchContent_MakeAvailable(raylib imgui rlimgui spdlog nanoflann)
+# FetchContent_Declare(
+#   mavlink
+#   GIT_REPOSITORY https://github.com/mavlink/mavlink.git
+#   GIT_TAG f1d42e2774cae767a1c0651b0f95e3286c587257
+#   GIT_PROGRESS TRUE
+# )
+
+set(SUPERBUILD ON)
+set(BUILD_SHARED_LIBSS OFF)
+set(BUILD_TESTS OFF)
+set(BUILD_TESTING OFF)
+set(BUILD_MAVSDK_SERVER OFF)
+
+FetchContent_Declare(
+  mavsdk
+  GIT_REPOSITORY https://github.com/mavlink/MAVSDK.git
+  GIT_TAG v2.12.5
+  GIT_PROGRESS TRUE
+)
+
+FetchContent_MakeAvailable(raylib imgui rlimgui spdlog nanoflann mavsdk)
+# FetchContent_MakeAvailable(raylib imgui rlimgui spdlog nanoflann mavlink mavsdk)
 
 add_library(imgui ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
@@ -71,4 +92,5 @@ endif()
 file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
 
 add_executable(air src/air/air.cpp)
-target_link_libraries(air ac_grpc_proto spdlog)
+target_link_libraries(air ac_grpc_proto spdlog mavsdk)
+target_compile_options(air PRIVATE -march=native)
