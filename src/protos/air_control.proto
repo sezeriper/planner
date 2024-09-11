@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 service air_control {
-    rpc record_trajectory(stream configuration_t) returns (empty_t) {}
+    rpc do_mission_chase(stream dubins_path_t) returns (empty_t) {}
 }
 
 message empty_t {}
@@ -14,4 +14,27 @@ message point_t {
 message configuration_t {
     point_t position = 1;
     float yaw = 2;
+}
+
+enum dubins_path_type_t {
+    UNKNOWN = 0;
+    LSL = 1;
+    LSR = 2;
+    RSL = 3;
+    RSR = 4;
+    RLR = 5;
+    LRL = 6;
+}
+
+message segment_lengths_t {
+    float segment_1 = 1;
+    float segment_2 = 2;
+    float segment_3 = 3;
+}
+
+message dubins_path_t {
+    configuration_t start = 1;
+    segment_lengths_t segment_lengths = 2;
+    float radius = 3;
+    dubins_path_type_t type = 4;
 }

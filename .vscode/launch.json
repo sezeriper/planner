@@ -7,7 +7,37 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "debug",
+            "name": "air-debug",
+            "preLaunchTask": "build-debug",
+            "program": "echo",
+            "args": [],
+            "cwd": "${workspaceFolder}/build",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "air-release",
+            "preLaunchTask": "build-release",
+            "program": "${workspaceFolder}/build/air",
+            "args": [],
+            "cwd": "${workspaceFolder}/build",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "air-relwithdeb",
+            "preLaunchTask": "build-relwithdeb",
+            "program": "${workspaceFolder}/build/air",
+            "args": [],
+            "cwd": "${workspaceFolder}/build",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "gcs-debug",
             "preLaunchTask": "build-debug",
             "program": "${workspaceFolder}/build/gcs",
             "args": [],
@@ -17,7 +47,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "release",
+            "name": "gcs-release",
             "preLaunchTask": "build-release",
             "program": "${workspaceFolder}/build/gcs",
             "args": [],
@@ -27,7 +57,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "relwithdeb",
+            "name": "gcs-relwithdeb",
             "preLaunchTask": "build-relwithdeb",
             "program": "${workspaceFolder}/build/gcs",
             "args": [],

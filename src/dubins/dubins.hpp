@@ -24,7 +24,7 @@
 
 constexpr float EPSILON = 10e-10;
 
-enum DubinsPathType : int
+enum class DubinsPathType : int
 {
     LSL = 0,
     LSR = 1,
@@ -156,7 +156,7 @@ int dubins_path_sample_many(const DubinsPath& path,
  * @param path - an initialised path
  * @param q    - the configuration result
  */
-int dubins_path_endvec2_t(const DubinsPath& path, float q[3]);
+int dubins_path_endpoint(const DubinsPath& path, float q[3]);
 
 /**
  * Convenience function to extract a subset of a path

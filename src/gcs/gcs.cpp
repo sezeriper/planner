@@ -1,14 +1,11 @@
+#define RL_CULL_DISTANCE_FAR 100000000.0 // not working
+
+#include "controller_mavlink.hpp"
+#include "controller_grpc.hpp"
 #include "ui.hpp"
 #include "field.hpp"
 
-#include <imgui_internal.h>
-#include <imgui.h>
-#include <raylib.h>
-#include <rlImGui.h>
-
-
 using namespace rota;
-
 
 int main() {
 
@@ -32,12 +29,16 @@ int main() {
 
     field_t field {border, obstacles};
 
-    ui_t ui(field);
+    controller_mavlink mav_ctrl;
+    mav_ctrl.init_mavsdk("udp://:14550");
+
+    controller_grpc grpc_ctrl("localhost:50051");
+
+    ui_t ui(field, mav_ctrl, grpc_ctrl);
     
-    bool is_first_run = true;
     while (!WindowShouldClose()) {
         ui.draw();
-        ui.get_input();
+        ui.handle_input();
     }
 
     return 0;

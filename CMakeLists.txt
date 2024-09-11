@@ -3,6 +3,10 @@ project(mission_control)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED 20)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -stdlib=libc++")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=native -stdlib=libc++ -lc++abi")
 
 include(FetchContent)
 Set(FETCHCONTENT_QUIET FALSE)
@@ -10,7 +14,7 @@ Set(FETCHCONTENT_QUIET FALSE)
 FetchContent_Declare(
   raylib
   GIT_REPOSITORY https://github.com/raysan5/raylib.git
-  GIT_TAG 5.0
+  GIT_TAG 10b01ba7c2139b9203045bb56aa8403ca810cc6b
   GIT_PROGRESS TRUE
 )
 
@@ -75,9 +79,8 @@ target_include_directories(rlimgui PRIVATE ${raylib_SOURCE_DIR}/src ${imgui_SOUR
 
 add_subdirectory(src/protos)
 
-add_executable(gcs src/gcs/gcs.cpp src/gcs/dubins/dubins.cpp)
-target_link_libraries(gcs raylib imgui rlimgui ac_grpc_proto spdlog nanoflann)
-target_compile_options(gcs PRIVATE -march=native)
+add_executable(gcs src/gcs/gcs.cpp src/dubins/dubins.cpp)
+target_link_libraries(gcs raylib imgui rlimgui ac_grpc_proto spdlog nanoflann mavsdk)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(gcs PRIVATE -Ofast)
@@ -91,6 +94,5 @@ endif()
 
 file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
 
-add_executable(air src/air/air.cpp)
+add_executable(air src/air/air.cpp src/dubins/dubins.cpp)
 target_link_libraries(air ac_grpc_proto spdlog mavsdk)
-target_compile_options(air PRIVATE -march=native)

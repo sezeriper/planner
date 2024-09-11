@@ -1,12 +1,13 @@
 #pragma once
 
 #include "field.hpp"
-#include "dubins/dubins.hpp"
+#include "../dubins/dubins.hpp"
+#include "../math.hpp"
 #include "path_planner.hpp"
-#include "grid.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
+
 
 namespace rota {
 
@@ -53,8 +54,8 @@ public:
         p2 = scale(p2, 5.0f);
         p2 = add(conf.get_point(), p2);
 
-        DrawLine3D(Vector3{conf.x, 0.0f, conf.y},
-                Vector3{p2.x, 0.0f, p2.y},
+        DrawLine3D({conf.x, 0.0f, conf.y},
+                {p2.x, 0.0f, p2.y},
                 BLUE);
     }
 
@@ -66,9 +67,24 @@ public:
 
     void draw_traj_simple(const trajectory_t& traj, real_t height = 0.0f, Color color = BLUE) const {
         for (std::size_t i = 0; i < traj.size() - 1; ++i) {
-            DrawLine3D(Vector3{traj[i].x, height, traj[i].y},
-                    Vector3{traj[i + 1].x, height, traj[i + 1].y},
+            DrawLine3D({traj[i].x, height, traj[i].y},
+                    {traj[i + 1].x, height, traj[i + 1].y},
                     color);
+        }
+    }
+
+    void draw_position_history(std::queue<vec3_t> points, real_t height = 0.0f, Color color = GREEN) const {
+        if (points.size() < 2) return;
+
+        vec3_t prev_point = points.front();
+        points.pop();
+        for (; !points.empty(); points.pop()) {
+            auto point = points.front();
+
+            DrawLine3D({prev_point.x, prev_point.y, prev_point.z},
+                    {point.x, point.y, point.z},
+                    color);
+            prev_point = point;
         }
     }
 
@@ -91,22 +107,19 @@ public:
         }
     }
 
-    template <typename T>
-    void draw_grid(const grid_spatial<T>& g) {
-        real_t w = g.get_width();
-        real_t h = g.get_height();
-        real_t cell_size = g.get_cell_size();
-        vec2_t tl = g.get_top_left();
+    void draw_grid(real_t w, real_t h, real_t cell_size, vec3_t center) {
+
+        vec2_t top_left = {center.x - (w * cell_size) / 2.0f, center.z - (h * cell_size) / 2.0f};
 
         for (real_t i = 0.0f; i <= w; ++i) {
-            Vector3 start {tl.x + i * cell_size, 0.0f, tl.y};
-            Vector3 end {tl.x + i * cell_size, 0.0f, tl.y + h * cell_size};
+            Vector3 start {top_left.x + i * cell_size, 0.0f, top_left.y};
+            Vector3 end {top_left.x + i * cell_size, 0.0f, top_left.y + h * cell_size};
             DrawLine3D(start, end, BLACK);
         }
 
         for (real_t i = 0.0f; i <= h; ++i) {
-            Vector3 start {tl.x, 0.0f, tl.y + i * cell_size};
-            Vector3 end {tl.x + w * cell_size, 0.0f, tl.y + i * cell_size};
+            Vector3 start {top_left.x, 0.0f, top_left.y + i * cell_size};
+            Vector3 end {top_left.x + w * cell_size, 0.0f, top_left.y + i * cell_size};
             DrawLine3D(start, end, BLACK);
         }
     }

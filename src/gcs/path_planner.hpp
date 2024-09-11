@@ -1,18 +1,15 @@
 #pragma once
 
-#include "math.hpp"
+#include "../math.hpp"
 #include "field.hpp"
-#include "dubins/dubins.hpp"
+#include "../dubins/dubins.hpp"
 
 #include <nanoflann.hpp>
 #include <spdlog/spdlog.h>
 
 #include <random>
-#include <tuple>
 #include <algorithm>
-#include <numbers>
 #include <cstdlib>
-#include <stack>
 #include <span>
 
 namespace rota {

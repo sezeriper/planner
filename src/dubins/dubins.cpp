@@ -19,10 +19,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifdef WIN32
-#define _USE_MATH_DEFINES
-#endif
-
 #include <cmath>
 #include "dubins.hpp"
 #include <numbers>
@@ -206,7 +202,7 @@ int dubins_path_sample( const DubinsPath& path, float t, float q[3] )
     float qi[3]; /* The translated initial configuration */
     float q1[3]; /* end-of segment 1 */
     float q2[3]; /* end-of segment 2 */
-    const SegmentType* types = DIRDATA[path.type];
+    const SegmentType* types = DIRDATA[static_cast<int>(path.type)];
     float p1, p2;
 
     if( t < 0.0f || t > dubins_path_length(path) ) {
@@ -259,7 +255,7 @@ int dubins_path_sample_many(const DubinsPath& path, float stepSize,
     return 0;
 }
 
-int dubins_path_endvec2_t( const DubinsPath& path, float q[3] )
+int dubins_path_endpoint( const DubinsPath& path, float q[3] )
 {
     return dubins_path_sample( path, dubins_path_length(path) - EPSILON, q );
 }
@@ -416,22 +412,22 @@ int dubins_word(DubinsIntermediateResults* in, DubinsPathType pathType, float ou
     int result;
     switch(pathType)
     {
-    case LSL:
+    case DubinsPathType::LSL:
         result = dubins_LSL(in, out);
         break;
-    case RSL:
+    case DubinsPathType::RSL:
         result = dubins_RSL(in, out);
         break;
-    case LSR:
+    case DubinsPathType::LSR:
         result = dubins_LSR(in, out);
         break;
-    case RSR:
+    case DubinsPathType::RSR:
         result = dubins_RSR(in, out);
         break;
-    case LRL:
+    case DubinsPathType::LRL:
         result = dubins_LRL(in, out);
         break;
-    case RLR:
+    case DubinsPathType::RLR:
         result = dubins_RLR(in, out);
         break;
     default:

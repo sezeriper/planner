@@ -60,7 +60,6 @@ add_custom_command(
         "${ac_proto}"
       DEPENDS "${ac_proto}")
 
-# rg_grpc_proto
 add_library(ac_grpc_proto
   ${ac_grpc_srcs}
   ${ac_grpc_hdrs}
