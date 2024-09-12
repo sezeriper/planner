@@ -4,6 +4,7 @@
 #include "controller_mavlink.hpp"
 #include "field.hpp"
 #include "../math.hpp"
+#include "referee_client.hpp"
 #include "visualizer.hpp"
 #include "camera.hpp"
 
@@ -27,7 +28,7 @@ constexpr float GRID_CELL_SIZE = 10.0f;
 namespace rota {
 class ui_t {
 public:
-    ui_t(field_t field, controller_mavlink& mav_ctrl, controller_grpc& grpc_ctrl) :
+    ui_t(field_t field, controller_mavlink& mav_ctrl, controller_grpc& grpc_ctrl, referee_client& referee) :
         _cam(),
         _io(),
         _font(),
@@ -37,6 +38,7 @@ public:
         _render_texture(),
         _mav_ctrl(mav_ctrl),
         _grpc_ctrl(grpc_ctrl),
+        _referee(referee),
         _cam_dist{100.0f}
     {
         InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, TITLE);
@@ -138,7 +140,7 @@ public:
             _mav_ctrl.do_hold();
         }
         if (do_login) {
-
+            _referee.login();
         }
     }
 
@@ -210,6 +212,7 @@ private:
     RenderTexture2D _render_texture;
     controller_mavlink& _mav_ctrl;
     controller_grpc& _grpc_ctrl;
+    referee_client& _referee;
 
     real_t _cam_dist;
     Vector2 _picked_point;

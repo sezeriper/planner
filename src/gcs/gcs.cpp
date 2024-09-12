@@ -35,9 +35,9 @@ int main() {
 
     controller_grpc grpc_ctrl("localhost:50051");
 
-    referee_client referee("127.0.0.1", mav_ctrl);
+    referee_client referee("127.0.0.1:8000", "rota", "sifre", mav_ctrl);
 
-    ui_t ui(field, mav_ctrl, grpc_ctrl);
+    ui_t ui(field, mav_ctrl, grpc_ctrl, referee);
     
     while (!WindowShouldClose()) {
         ui.draw();

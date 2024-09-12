@@ -1,7 +1,5 @@
 #include "ac_server.hpp"
 
-#include "ac_server.hpp"
-
 #include <mavsdk.h>
 #include <plugins/action/action.h>
 #include <plugins/offboard/offboard.h>
