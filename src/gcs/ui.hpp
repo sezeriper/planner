@@ -15,8 +15,8 @@
 #include <rlImGui.h>
 
 
-constexpr int SCREEN_WIDTH = 1920;
-constexpr int SCREEN_HEIGHT = 1080;
+constexpr int SCREEN_WIDTH = 1280;
+constexpr int SCREEN_HEIGHT = 720;
 constexpr auto TITLE = "Pars - GCS";
 constexpr int FPS = 60;
 constexpr auto BG_COLOR = DARKGRAY;
@@ -117,6 +117,7 @@ public:
         bool do_arm = ImGui::Button("Arm");
         bool do_hold = ImGui::Button("Hold");
         bool do_offboard = ImGui::Button("Offboard");
+        bool do_login = ImGui::Button("Login");
         ImGui::SliderFloat("Camera Distance", &_cam_dist, 50.0f, 500.0f);
         ImGui::End();
 
@@ -136,8 +137,8 @@ public:
         if (do_hold) {
             _mav_ctrl.do_hold();
         }
-        if (do_offboard) {
-            _mav_ctrl.do_offboard();
+        if (do_login) {
+
         }
     }
 
@@ -150,7 +151,7 @@ public:
             _picked_point = pick_point();
         }
 
-        update_path();
+        // update_path();
     }
 
     void update_path() {

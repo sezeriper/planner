@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <span>
+#include <stack>
 
 namespace rota {
 template <

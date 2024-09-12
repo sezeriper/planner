@@ -67,7 +67,18 @@ FetchContent_Declare(
   GIT_PROGRESS TRUE
 )
 
-FetchContent_MakeAvailable(raylib imgui rlimgui spdlog nanoflann mavsdk)
+set(CURL_ZLIB OFF)
+FetchContent_Declare(
+  cpr
+  GIT_REPOSITORY https://github.com/libcpr/cpr.git
+  GIT_TAG 1.10.5
+  GIT_PROGRESS TRUE
+)
+
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+
+
+FetchContent_MakeAvailable(raylib imgui rlimgui spdlog nanoflann mavsdk cpr json)
 # FetchContent_MakeAvailable(raylib imgui rlimgui spdlog nanoflann mavlink mavsdk)
 
 add_library(imgui ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
@@ -80,7 +91,7 @@ target_include_directories(rlimgui PRIVATE ${raylib_SOURCE_DIR}/src ${imgui_SOUR
 add_subdirectory(src/protos)
 
 add_executable(gcs src/gcs/gcs.cpp src/dubins/dubins.cpp)
-target_link_libraries(gcs raylib imgui rlimgui ac_grpc_proto spdlog nanoflann mavsdk)
+target_link_libraries(gcs raylib imgui rlimgui ac_grpc_proto spdlog nanoflann mavsdk cpr nlohmann_json)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(gcs PRIVATE -Ofast)

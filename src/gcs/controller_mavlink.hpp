@@ -129,6 +129,10 @@ public:
         });
     }
 
+    std::uint64_t get_unix_epoch_time() {
+        return _telemetry->unix_epoch_time();
+    }
+
 private:
     static constexpr std::size_t MAX_POSITION_HISTORY_LENGTH = 4096;
 
