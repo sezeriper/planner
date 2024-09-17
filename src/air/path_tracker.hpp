@@ -56,6 +56,7 @@ public:
             }
         });
 
+        _telemetry->set_rate_position_velocity_ned(60.0);
         _telemetry->subscribe_position_velocity_ned([this](mavsdk::Telemetry::PositionVelocityNed position_velocity_ned) {
             _position.write([&position_velocity_ned](position_t& pos) {
                 pos = {
@@ -65,6 +66,8 @@ public:
                 };
             });
         });
+
+        _telemetry->set_rate_unix_epoch_time(60.0);
 
         spdlog::info("Plane Controller deady.");
         return true;
@@ -84,6 +87,10 @@ public:
         return _position.read([](const position_t& pos) {
             return pos;
         });
+    }
+
+    std::uint64_t get_unix_epoch_time() const {
+        return _telemetry->unix_epoch_time();
     }
 
     void set_configuration(configuration_t conf) {
@@ -137,7 +144,6 @@ public:
         }
         _plane_control.start_offboard();
     }
-
 
 private:
     plane_control& _plane_control;

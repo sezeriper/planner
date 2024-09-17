@@ -5,15 +5,16 @@
 #include "field.hpp"
 #include "../math.hpp"
 #include "referee_client.hpp"
+#include "spdlog/spdlog.h"
 #include "visualizer.hpp"
 #include "camera.hpp"
 
-#include <chrono>
 #include <raylib.h>
 #include <rlgl.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <rlImGui.h>
+#include <unordered_map>
 
 
 constexpr int SCREEN_WIDTH = 1280;
@@ -44,6 +45,11 @@ public:
         InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, TITLE);
         SetTargetFPS(FPS);
         rlImGuiSetup(true);
+        rlSetClipPlanes(0.001, 2000.0);
+
+        for (auto& point : _field.border) {
+            point = _mav_ctrl.coords_to_xz(point.x, point.y);
+        }
 
         _vis.init(_field);
 
@@ -90,7 +96,7 @@ public:
         ClearBackground(BG_COLOR);
         BeginMode3D(_cam.get());
 
-        // _vis.draw_field(_field);
+        _vis.draw_field();
 
         _vis.draw_position_history(_mav_ctrl.get_position_history(), 0.0f, GREEN);
 
@@ -114,12 +120,18 @@ public:
 
         ImGui::SetNextWindowClass(&window_class);
         ImGui::Begin("Controls");
-        bool do_takeoff = ImGui::Button("Takeoff");
-        bool do_land = ImGui::Button("Land");
-        bool do_arm = ImGui::Button("Arm");
-        bool do_hold = ImGui::Button("Hold");
-        bool do_offboard = ImGui::Button("Offboard");
-        bool do_login = ImGui::Button("Login");
+
+        bool do_takeoff = button_once("Takeoff");
+        bool do_land = button_once("Land");
+        bool do_arm = button_once("Arm");
+        bool do_hold = button_once("Hold");
+        bool do_login = button_once("Login");
+        bool do_kamikaze = button_once("Kamikaze");
+        bool do_chase = button_once("Chase");
+        bool abort_kamikaze = button_once("Abort Kamikaze");
+        bool abort_chase = button_once("Abort Chase");
+        bool get_hss = button_once("Get HSS");
+
         ImGui::SliderFloat("Camera Distance", &_cam_dist, 50.0f, 500.0f);
         ImGui::End();
 
@@ -142,6 +154,40 @@ public:
         if (do_login) {
             _referee.login();
         }
+        if (do_kamikaze) {
+            spdlog::info("Kamikaze mission started.");
+            auto start = _referee.get_time();
+            _grpc_ctrl.do_mission_kamikaze([this, start](const std::string& text) {
+                auto end = _referee.get_time();
+                _referee.send_kamikaze_info(start, end, text);
+            });
+        }
+        if (do_chase) {
+            spdlog::info("Chase mission started.");
+            _grpc_ctrl.do_mission_chase([this](std::uint64_t start, std::uint64_t end){
+                spdlog::info("Chase mission completed.");
+                spdlog::info("Locked for {} seconds.", static_cast<double>(end - start) / 1000000.0);
+                _referee.send_lock_info(referee_client::unix_to_time(start), referee_client::unix_to_time(end));
+            });
+        }
+        if (abort_kamikaze) {
+            _grpc_ctrl.abort_mission_kamikaze();
+        }
+        if (get_hss) {
+            auto hss_arr = _referee.get_hss_coords();
+            _field.obstacles.clear();
+            for (const referee_client::hss_t& hss : hss_arr) {
+                auto obstacle = _referee.hss_to_obstacle(hss);
+                _field.obstacles.push_back(obstacle);
+            }
+        }
+    }
+
+    bool button_once(const std::string& name) {
+        bool btn = ImGui::Button(name.c_str());
+        bool ret = btn == false && _button_states[name] == true;
+        _button_states[name] = btn;
+        return ret;
     }
 
     void handle_input() {
@@ -149,59 +195,59 @@ public:
         _cam.set_distance(_cam_dist);
         _cam.handle_input();
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-            _picked_point = pick_point();
-        }
+        // if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+        //     _picked_point = pick_point();
+        // }
 
         // update_path();
     }
 
-    void update_path() {
-        if (GetTime() - _last_update < 4.0f) {
-            return;
-        }
-        auto pos = _mav_ctrl.get_position_xyz();
-        configuration_t from = {
-            pos.x,
-            pos.z,
-            _mav_ctrl.get_heading()
-        };
-        configuration_t to = {
-            _picked_point.x,
-            _picked_point.y,
-            0.0f
-        };
-        auto path = find_path(from, to, 25.0f);
-        if (!path) {
-            spdlog::error("No path found.");
-        }
-        else {
-            _picked_paths.clear();
-            _picked_paths.push_back(path.value());
-            _grpc_ctrl.do_mission_chase(_picked_paths);
-        }
-        _last_update = GetTime();
-    }
+    // void update_path() {
+    //     if (GetTime() - _last_update < 4.0f) {
+    //         return;
+    //     }
+    //     auto pos = _mav_ctrl.get_position_xyz();
+    //     configuration_t from = {
+    //         pos.x,
+    //         pos.z,
+    //         _mav_ctrl.get_heading()
+    //     };
+    //     configuration_t to = {
+    //         _picked_point.x,
+    //         _picked_point.y,
+    //         0.0f
+    //     };
+    //     auto path = find_path(from, to, 25.0f);
+    //     if (!path) {
+    //         spdlog::error("No path found.");
+    //     }
+    //     else {
+    //         _picked_paths.clear();
+    //         _picked_paths.push_back(path.value());
+    //         _grpc_ctrl.do_mission_chase(_picked_paths);
+    //     }
+    //     _last_update = GetTime();
+    // }
 
-    Vector2 pick_point() const {
-        Vector2 local_mouse = GetMousePosition();
-        local_mouse.x -= _window_pos.x;
-        local_mouse.y -= _window_pos.y;
-        Ray ray = GetScreenToWorldRayEx(local_mouse, _cam.get(), _prev_region.x, _prev_region.y);
+    // Vector2 pick_point() const {
+    //     Vector2 local_mouse = GetMousePosition();
+    //     local_mouse.x -= _window_pos.x;
+    //     local_mouse.y -= _window_pos.y;
+    //     Ray ray = GetScreenToWorldRayEx(local_mouse, _cam.get(), _prev_region.x, _prev_region.y);
 
-        Vector3 p1 {-FLY_AREA_SIZE / 2.0f, 0.0f, -FLY_AREA_SIZE / 2.0f};
-        Vector3 p2 {-FLY_AREA_SIZE / 2.0f, 0.0f,  FLY_AREA_SIZE / 2.0f};
-        Vector3 p3 { FLY_AREA_SIZE / 2.0f, 0.0f,  FLY_AREA_SIZE / 2.0f};
-        Vector3 p4 { FLY_AREA_SIZE / 2.0f, 0.0f, -FLY_AREA_SIZE / 2.0f};
+    //     Vector3 p1 {-FLY_AREA_SIZE / 2.0f, 0.0f, -FLY_AREA_SIZE / 2.0f};
+    //     Vector3 p2 {-FLY_AREA_SIZE / 2.0f, 0.0f,  FLY_AREA_SIZE / 2.0f};
+    //     Vector3 p3 { FLY_AREA_SIZE / 2.0f, 0.0f,  FLY_AREA_SIZE / 2.0f};
+    //     Vector3 p4 { FLY_AREA_SIZE / 2.0f, 0.0f, -FLY_AREA_SIZE / 2.0f};
 
-        RayCollision hit = GetRayCollisionQuad(ray, p1, p2, p3, p4);
+    //     RayCollision hit = GetRayCollisionQuad(ray, p1, p2, p3, p4);
 
-        if (hit.hit) {
-            spdlog::info("Picked point: ({}, {})", hit.point.x, hit.point.z);
-            return {hit.point.x, hit.point.z};
-        }
-        return _picked_point;
-    }
+    //     if (hit.hit) {
+    //         spdlog::info("Picked point: ({}, {})", hit.point.x, hit.point.z);
+    //         return {hit.point.x, hit.point.z};
+    //     }
+    //     return _picked_point;
+    // }
 private:
     camera _cam;
     ImGuiIO* _io;
@@ -219,5 +265,6 @@ private:
     std::vector<DubinsPath> _picked_paths;
     ImVec2 _window_pos;
     double _last_update = 0.0;
+    std::unordered_map<std::string, bool> _button_states;
 };
 }
