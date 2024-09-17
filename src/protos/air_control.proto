@@ -1,10 +1,21 @@
 syntax = "proto3";
 
 service air_control {
-    rpc do_mission_chase(stream dubins_path_t) returns (empty_t) {}
+    rpc do_mission_chase(stream dubins_path_t) returns (chase_result_t) {}
+ 
+    rpc do_mission_kamikaze(stream dubins_path_t) returns (qr_result_t) {}
 }
 
 message empty_t {}
+
+message chase_result_t {
+    uint64 start_time = 1;
+    uint64 end_time = 2;
+}
+
+message qr_result_t {
+    string text = 1;
+}
 
 message point_t {
     float x = 1;

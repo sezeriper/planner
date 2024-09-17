@@ -1,15 +1,15 @@
 #pragma once
 
 #include <shared_mutex>
+#include <mutex>
 
 namespace rota {
-template<
-    class T,
-    class M=std::shared_mutex,
-    template<class...> class WL=std::unique_lock,
-    template<class...> class RL=std::shared_lock
-> 
+template<class T> 
 struct mutex_guarded {
+    using M = std::shared_mutex;
+    using WL = std::unique_lock<M>;
+    using RL = std::shared_lock<M>;
+
     auto read( auto f ) const {
         auto l = lock();
         return f(t);
@@ -23,7 +23,7 @@ struct mutex_guarded {
 private:
     mutable M m;
     T t;
-    auto lock() const { return RL<M>(m); }
-    auto lock() { return WL<M>(m); }
+    auto lock() const { return RL(m); }
+    auto lock() { return WL(m); }
 };
 }

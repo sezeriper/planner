@@ -5,8 +5,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED 20)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -stdlib=libc++")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=native -stdlib=libc++ -lc++abi")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=native")
 
 include(FetchContent)
 Set(FETCHCONTENT_QUIET FALSE)
@@ -103,7 +103,10 @@ if (APPLE)
     target_link_libraries(gcs "-framework OpenGL")
 endif()
 
-file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})
+find_package( OpenCV REQUIRED )
 
 add_executable(air src/air/air.cpp src/dubins/dubins.cpp)
-target_link_libraries(air ac_grpc_proto spdlog mavsdk)
+target_include_directories(air PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(air ac_grpc_proto spdlog mavsdk ${OpenCV_LIBS})
+
+file(COPY resources DESTINATION ${CMAKE_BINARY_DIR})

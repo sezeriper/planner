@@ -64,5 +64,11 @@ enum class flight_mode_t {
     Stabilized,
     Rattitude,
 };
+
+struct velocity_t {
+    real_t north; // m/s
+    real_t east; // m/s
+    real_t down; // m/s
+};
 }
 }

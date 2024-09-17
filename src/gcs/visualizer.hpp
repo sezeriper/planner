@@ -4,6 +4,7 @@
 #include "../dubins/dubins.hpp"
 #include "../math.hpp"
 #include "path_planner.hpp"
+#include "referee_client.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
@@ -15,7 +16,8 @@ class visualizer {
 public:
 
     void init(field_t field) {
-        model_border = gen_model_border(field.border);
+        _field = field;
+        model_border = gen_model_border(_field.border);
         model_node = LoadModelFromMesh(GenMeshSphere(0.25f, 4, 8));
 
         for (const auto& obstacle : field.obstacles) {
@@ -23,9 +25,17 @@ public:
         }
     }
 
-    void draw_field(const field_t& field) const {
+    void update_field(field_t field) {
+        _field = field;
+        model_border = gen_model_border(_field.border);
+        for (const auto& obstacle : field.obstacles) {
+            model_obstacles.push_back(LoadModelFromMesh(GenMeshCylinder(obstacle.radius, 5.0f, 32)));
+        }
+    }
+
+    void draw_field() const {
         draw_border();
-        draw_obstacles(field.obstacles);
+        draw_obstacles(_field.obstacles);
     }
 
     void draw_border() const {
@@ -61,7 +71,7 @@ public:
 
     void draw_obstacles(const obstacles_t& obstacles) const {
         for (const auto& obstacle : obstacles) {
-            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius, 5.0f, 32, BLACK);
+            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius, 5.0f, 32, RED);
         }
     }
 
@@ -86,6 +96,9 @@ public:
                     color);
             prev_point = point;
         }
+    }
+
+    void draw_hss() {
     }
 
     void draw_traj_smooth(const trajectory_t& path, real_t rho, real_t height = 0.0f, Color color = BLUE) const {
@@ -128,6 +141,7 @@ private:
     Model model_border;
     Model model_node;
     std::vector<Model> model_obstacles;
+    field_t _field;
 
     Mesh gen_mesh_border(const std::vector<vec2_t>& vec2_ts) {
         Mesh mesh{};
@@ -173,7 +187,7 @@ private:
 
     Model gen_model_border(const std::vector<vec2_t>& vec2_ts) {
         Model border = LoadModelFromMesh(gen_mesh_border(vec2_ts));
-        border.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
+        border.materials[0].maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
         return border;
     }

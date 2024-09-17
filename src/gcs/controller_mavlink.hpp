@@ -3,6 +3,7 @@
 #include "../math.hpp"
 #include "../utils.hpp"
 #include "../messages.hpp"
+#include "field.hpp"
 
 #include <mavsdk.h>
 #include <plugins/action/action.h>
@@ -29,6 +30,8 @@ public:
         bool result = setup_mavsdk(mavsdk_connection_string);
 
         if (!result) return false;
+
+        _telemetry->set_rate_unix_epoch_time(10.0);
 
         setup_mavsdk_subscription();
 
@@ -133,6 +136,38 @@ public:
         return _telemetry->unix_epoch_time();
     }
 
+    velocity_t get_velocity() {
+        return _data_velocity.read([](const velocity_t& vel) {
+            return vel;
+        });
+    }
+
+    static constexpr vec3_t ned_to_xyz(real_t north, real_t east, real_t down) {
+        return {north, -down, east};
+    }
+
+    vec2_t coords_to_ne(real_t lat, real_t lon) {
+        mavsdk::geometry::CoordinateTransformation::GlobalCoordinate coords{};
+        _data_coords.read([&coords](const coords_t& c) {
+            coords.latitude_deg = c.lat;
+            coords.longitude_deg = c.lon;
+        });
+
+        mavsdk::geometry::CoordinateTransformation transform(coords);
+
+        auto local = transform.local_from_global({ lat, lon });
+        return {
+            static_cast<real_t>(local.north_m),
+            static_cast<real_t>(local.east_m)
+        };
+    }
+
+    vec2_t coords_to_xz(real_t lat, real_t lon) {
+        auto ne = coords_to_ne(lat, lon);
+        vec3_t xyz = ned_to_xyz(ne.x,  ne.y, 0.0f);
+        return {xyz.x, xyz.z};
+    }
+
 private:
     static constexpr std::size_t MAX_POSITION_HISTORY_LENGTH = 4096;
 
@@ -151,12 +186,9 @@ private:
     mutex_guarded<gps_origin_t> _data_gps_origin;
     mutex_guarded<bool> _data_is_armed;
     mutex_guarded<flight_mode_t> _data_flight_mode;
+    mutex_guarded<velocity_t> _data_velocity;
 
     mutex_guarded<std::queue<vec3_t>> _position_history;
-
-    static constexpr vec3_t ned_to_xyz(real_t north, real_t east, real_t down) {
-        return {north, -down, east};
-    }
 
     static void action_handler(mavsdk::Action::Result result, const std::string& action_name) {
         if (result == mavsdk::Action::Result::Success) {
@@ -275,8 +307,16 @@ private:
         });
 
         _telemetry->subscribe_flight_mode([this](mavsdk::Telemetry::FlightMode flight_mode) {
-            _data_flight_mode.write([flight_mode](flight_mode_t fm) {
+            _data_flight_mode.write([flight_mode](flight_mode_t& fm) {
                 fm = static_cast<flight_mode_t>(flight_mode);
+            });
+        });
+
+        _telemetry->subscribe_velocity_ned([this](mavsdk::Telemetry::VelocityNed velocity_ned) {
+            _data_velocity.write([&velocity_ned](velocity_t& vel) {
+                vel.north = velocity_ned.north_m_s;
+                vel.east = velocity_ned.east_m_s;
+                vel.down = velocity_ned.down_m_s;
             });
         });
     }

@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "air-debug",
             "preLaunchTask": "build-debug",
-            "program": "echo",
+            "program": "${workspaceFolder}/build/air",
             "args": [],
             "cwd": "${workspaceFolder}/build",
             "console": "integratedTerminal"
