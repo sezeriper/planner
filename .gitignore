@@ -1,3 +1,4 @@
 build/
 .cache/
 imgui.ini
+resources/rota_yolov10m.onnx
