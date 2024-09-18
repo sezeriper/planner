@@ -37,10 +37,6 @@ int main() {
 
     controller_mavlink mav_ctrl;
     bool result = mav_ctrl.init_mavsdk("udp://:14445");
-<<<<<<< HEAD
-
-=======
->>>>>>> 7ac75d50919ade29f3f13f40ec5417b92ceff5a9
     if (!result) {
         spdlog::error("Mavsdk initialization failed.");
         return 1;
