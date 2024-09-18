@@ -37,6 +37,7 @@ int main() {
 
     controller_mavlink mav_ctrl;
     bool result = mav_ctrl.init_mavsdk("udp://:14445");
+
     if (!result) {
         spdlog::error("Mavsdk initialization failed.");
         return 1;
@@ -44,7 +45,7 @@ int main() {
 
     controller_grpc grpc_ctrl("localhost:50051");
 
-    referee_client referee("127.0.0.1:8000", "rota", "sifre", mav_ctrl);
+    referee_client referee("10.0.0.11:10001", "rotasscgm", "n55XFpQHmn", mav_ctrl);
 
     ui_t ui(field, mav_ctrl, grpc_ctrl, referee);
 

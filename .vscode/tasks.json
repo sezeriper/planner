@@ -6,17 +6,17 @@
         {
             "label": "build-debug",
             "type": "shell",
-            "command": "cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j16 --config Debug"
+            "command": "cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j8 --config Debug"
         },
         {
             "label": "build-release",
             "type": "shell",
-            "command": "cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build -j16 --config Release"
+            "command": "cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build -j8 --config Release"
         },
         {
             "label": "build-relwithdeb",
             "type": "shell",
-            "command": "cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build -j16 --config RelWithDebInfo"
+            "command": "cmake -S. -Bbuild -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo && cmake --build build -j8 --config RelWithDebInfo"
         }
     ]
 }

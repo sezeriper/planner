@@ -2,6 +2,7 @@
 
 #include "controller_mavlink.hpp"
 #include "cpr/api.h"
+#include "cpr/cookies.h"
 #include "cpr/cprtypes.h"
 #include "cpr/response.h"
 #include "cpr/timeout.h"
@@ -17,10 +18,11 @@ using json = nlohmann::json;
 
 namespace rota {
 class referee_client {
-    static constexpr int TELEM_INTERVAL = 900;
+    static constexpr int TELEM_INTERVAL = 500;
     // using hss_arr_t = std::vector<std::map<std::string, real_t>>;
 public:
     struct time_t {
+        // int day;
         int hour;
         int minute;
         int second;
@@ -54,13 +56,14 @@ public:
         _team_name(team_name),
         _pswd(pswd),
         _mavlink{plane_controller},
-        _thread([this]() { thread_func(); }),
         _team_no(),
         _is_running(true),
         _time_offset(0ull),
         _qr_coords(0.0f, 0.0f),
         _hss_arr(),
-        _timeout(1000)
+        _timeout(1000),
+        _session(),
+        _thread([this]() { thread_func(); })
         {}
 
     ~referee_client() {
@@ -80,6 +83,7 @@ public:
         auto date = *std::gmtime(&t);
 
         time_t time;
+        // time.day = date.tm_mday;
         time.hour = date.tm_hour;
         time.minute = date.tm_min;
         time.second = date.tm_sec;
@@ -91,21 +95,22 @@ public:
     referee_client::time_t get_time() const {
         // in microseconds
         std::uint64_t unix_epoch_time = _mavlink.get_unix_epoch_time() + _time_offset;
+        // unix_epoch_time -= 1000000;
         return unix_to_time(unix_epoch_time);
     };
 
     void login() {
-        json my_json = json::object({
+        json data = json::object({
             {"kadi", _team_name},
             {"sifre", _pswd}
         });
 
-        cpr::Response r = cpr::Post(
-            cpr::Url{get_uri("/api/giris")},
-            cpr::Header{{"Content-Type", "application/json"}},
-            cpr::Body{my_json.dump()},
-            cpr::Timeout{_timeout}
-        );
+        _session.SetUrl(get_uri("/api/giris"));
+        _session.SetBody(data.dump());
+        _session.SetHeader({{"Content-Type", "application/json"}});
+        _session.SetTimeout(_timeout);
+
+        auto r = _session.Post();
 
         if (r.status_code != 200) {
             spdlog::error("Login failed: {}", r.status_code);
@@ -116,10 +121,14 @@ public:
         spdlog::info("Login successful.");
         spdlog::info("Password: {}", _team_no);
 
-        r = cpr::Get(cpr::Url(get_uri("/api/sunucusaati")));
+        _session.SetUrl("/api/sunucusaati");
+        r = _session.Get();
         if (r.status_code != 200) {
             spdlog::error("GET request /api/sunucusaati failed with code: {}", r.status_code);
             return;
+        }
+        else {
+            spdlog::info("Sunucu saati alindi.");
         }
 
         json data_json = json::parse(r.text);
@@ -129,14 +138,11 @@ public:
 
     void send_telemetry() {
         auto data = get_telem_data();
-        data["takim_numarasi"] = _team_no;
 
-        cpr::Response r = cpr::Post(
-            cpr::Url{"http://" + _referee_server_ip + "/api/telemetri_gonder"},
-            cpr::Header{{"Content-Type", "application/json"}},
-            cpr::Body{data.dump()},
-            cpr::Timeout{_timeout}
-        );
+        _session.SetUrl(get_uri("/api/telemetri_gonder"));
+        _session.SetBody(data.dump());
+        auto r = _session.Post();
+        spdlog::info(r.text);
 
         if (r.status_code != 200) {
             spdlog::error("Post request /api/telemetri_gonder failed with code: {}", r.status_code);
@@ -147,14 +153,12 @@ public:
         server_time_t time = parse_time(data["sunucusaati"]);
         update_time(time);
 
-        spdlog::info("-----------------------------");
         spdlog::info(r.text);
     }
 
     void get_qr_coords() {
-        cpr::Response r = cpr::Get(cpr::Url("/api/qr_koordinati"),
-            cpr::Timeout{_timeout}
-        );
+        _session.SetUrl(get_uri("/api/qr_koordinati"));
+        auto r = _session.Get();
         if (r.status_code != 200) {
             spdlog::error("Get request /api/qr_koordinati failed with code: {}", r.status_code);
             return;
@@ -169,9 +173,8 @@ public:
     }
 
     hss_arr_t get_hss_coords() {
-        cpr::Response r = cpr::Get(cpr::Url(get_uri("/api/hss_koordinatlari")),
-            cpr::Timeout{_timeout}
-        );
+        _session.SetUrl(get_uri("/api/hss_koordinatlari"));
+        auto r = _session.Get();
         if (r.status_code != 200) {
             spdlog::error("Get request /api/qr_koordinati failed with code: {}", r.status_code);
             return {};
@@ -198,7 +201,7 @@ public:
         return _hss_arr;
     }
 
-    void send_lock_info(time_t start, time_t end) const {
+    void send_lock_info(time_t start, time_t end) {
         json data = json::object({
             {
                 "kilitlenmeBaslangicZamani", {
@@ -219,19 +222,17 @@ public:
             {"otonom_kilitlenme", 1}
         });
 
-        cpr::Response r = cpr::Post(
-            cpr::Url{get_uri("/api/kilitlenme_bilgisi")},
-            cpr::Header{{"Content-Type", "application/json"}},
-            cpr::Body{data.dump()},
-            cpr::Timeout{_timeout}
-        );
+        _session.SetUrl(get_uri("/api/kilitlenme_bilgisi"));
+        _session.SetBody(data.dump());
+        auto r = _session.Post();
+
         if (r.status_code != 200) {
             spdlog::error("Post request /api/kilitlenme_bilgisi failed with code: {}", r.status_code);
             return;
         }
     }
 
-    void send_kamikaze_info(time_t start, time_t end, const std::string& text) const {
+    void send_kamikaze_info(time_t start, time_t end, const std::string& text) {
         json data = json::object({
             {
                 "kamikazeBaslangicZamani",
@@ -254,19 +255,15 @@ public:
             {"qrMetni", text}
         });
 
-        cpr::Response r = cpr::Post(
-            cpr::Url{get_uri("/api/kamikaze_bilgisi")},
-            cpr::Header{{"Content-Type", "application/json"}},
-            cpr::Body{data.dump()},
-            cpr::Timeout{_timeout}
-        );
+        _session.SetUrl(get_uri("/api/kamikaze_bilgisi"));
+        _session.SetBody(data.dump());
+        auto r = _session.Post();
 
         if (r.status_code != 200) {
             spdlog::error("Post request /api/kamikaze_bilgisi failed with code: {}", r.status_code);
             return;
         }
     }
-
 
 private:
 
@@ -278,13 +275,14 @@ private:
     std::string _team_name;
     std::string _pswd;
     controller_mavlink& _mavlink;
-    std::thread _thread;
     std::string _team_no;
     std::atomic_bool _is_running;
     std::uint64_t _time_offset;
     qr_coords_t _qr_coords;
     hss_arr_t _hss_arr;
     int _timeout;
+    cpr::Session _session;
+    std::thread _thread;
 
     server_time_t parse_time(const json& data) const {
         return {
@@ -327,29 +325,38 @@ private:
         velocity_t vel = _mavlink.get_velocity();
         battery_t battery = _mavlink.get_battery();
         referee_client::time_t time = get_time();
+        flight_mode_t flight_mode = _mavlink.get_flight_mode();
 
-
-        json data;
-        data["iha_enlem"] = _mavlink.get_coords().lat;
-        data["iha_boylam"] = _mavlink.get_coords().lon;
-        data["iha_irtifa"] = _mavlink.get_coords().alt;
-        data["iha_dikilme"] = _mavlink.get_attitude().pitch;
-        data["iha_yonelme"] = convert_yaw(_mavlink.get_attitude().yaw);
-        data["iha_yatis"] = _mavlink.get_attitude().roll;
-        data["iha_hiz"] = std::sqrt((vel.north * vel.north) + (vel.east * vel.east));
-        data["iha_batarya"] = _mavlink.get_battery().remaining_percent;
-        data["iha_otonom"] = 0;
-        data["iha_kilitlenme"] = 0;
-        data["hedef_merkez_X"] = 0;
-        data["hedef_merkez_Y"] = 0;
-        data["hedef_genislik"] = 0;
-        data["hedef_yukseklik"] = 0;
-        data["gps_saati"] = {
-            {"saat", time.hour},
-            {"dakika", time.minute},
-            {"saniye", time.second},
-            {"milisaniye", time.millisecond}
-        };
+        json data = json::object({
+            {"takim_numarasi", std::stoi(_team_no)},
+            {"iha_enlem", _mavlink.get_coords().lat},
+            {"iha_boylam", _mavlink.get_coords().lon},
+            {"iha_irtifa", static_cast<int64_t>(_mavlink.get_coords().alt)},
+            {"iha_dikilme", static_cast<int64_t>(_mavlink.get_attitude().pitch)},
+            {"iha_yonelme", static_cast<int64_t>(convert_yaw(_mavlink.get_attitude().yaw))},
+            {"iha_yatis", static_cast<int64_t>(_mavlink.get_attitude().roll)},
+            {"iha_hiz", static_cast<int64_t>(std::sqrt((vel.north * vel.north) + (vel.east * vel.east)))},
+            {"iha_batarya", static_cast<int64_t>(_mavlink.get_battery().remaining_percent)},
+            {"iha_otonom", static_cast<int64_t>(
+                flight_mode != flight_mode_t::Manual &&
+                flight_mode != flight_mode_t::Stabilized &&
+                flight_mode != flight_mode_t::Acro &&
+                flight_mode != flight_mode_t::Rattitude &&
+                flight_mode != flight_mode_t::Posctl &&
+                flight_mode != flight_mode_t::Altctl
+            )},
+            {"iha_kilitlenme", 0},
+            {"hedef_merkez_X", 0},
+            {"hedef_merkez_Y", 0},
+            {"hedef_genislik", 0},
+            {"hedef_yukseklik", 0},
+            {"gps_saati", {
+                {"saat", time.hour},
+                {"dakika", time.minute},
+                {"saniye", time.second},
+                {"milisaniye", time.millisecond}
+             }}
+        });
 
         return data;
     }

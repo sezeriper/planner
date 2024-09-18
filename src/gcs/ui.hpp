@@ -131,6 +131,7 @@ public:
         bool abort_kamikaze = button_once("Abort Kamikaze");
         bool abort_chase = button_once("Abort Chase");
         bool get_hss = button_once("Get HSS");
+        bool get_qr = button_once("Get QR");
 
         ImGui::SliderFloat("Camera Distance", &_cam_dist, 50.0f, 500.0f);
         ImGui::End();
@@ -180,6 +181,10 @@ public:
                 auto obstacle = _referee.hss_to_obstacle(hss);
                 _field.obstacles.push_back(obstacle);
             }
+            _vis.update_field(_field);
+        }
+        if (get_qr) {
+            _referee.get_qr_coords();
         }
     }
 

@@ -15,7 +15,7 @@ using namespace rota;
 
 static bool run_server() {
     plane_control pc;
-    bool result = pc.init("udp://:14540");
+    bool result = pc.init("udp://:14445");
 
     if (!result) {
         spdlog::error("Mavlink connection failed.");
@@ -24,7 +24,7 @@ static bool run_server() {
 
     path_tracker pt(pc);
 
-    video_recorder vid;
+    video_recorder vid(pc);
 
     qr_reader reader(vid);
     uav_detector detector(vid, pc);

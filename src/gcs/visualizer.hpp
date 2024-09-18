@@ -4,10 +4,10 @@
 #include "../dubins/dubins.hpp"
 #include "../math.hpp"
 #include "path_planner.hpp"
-#include "referee_client.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
+#include <queue>
 
 
 namespace rota {
@@ -19,18 +19,11 @@ public:
         _field = field;
         model_border = gen_model_border(_field.border);
         model_node = LoadModelFromMesh(GenMeshSphere(0.25f, 4, 8));
-
-        for (const auto& obstacle : field.obstacles) {
-            model_obstacles.push_back(LoadModelFromMesh(GenMeshCylinder(obstacle.radius, 5.0f, 32)));
-        }
     }
 
     void update_field(field_t field) {
         _field = field;
         model_border = gen_model_border(_field.border);
-        for (const auto& obstacle : field.obstacles) {
-            model_obstacles.push_back(LoadModelFromMesh(GenMeshCylinder(obstacle.radius, 5.0f, 32)));
-        }
     }
 
     void draw_field() const {
@@ -71,7 +64,7 @@ public:
 
     void draw_obstacles(const obstacles_t& obstacles) const {
         for (const auto& obstacle : obstacles) {
-            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius, 5.0f, 32, RED);
+            DrawCylinder({obstacle.position.x, 0.0f, obstacle.position.y}, obstacle.radius - 2.0f, obstacle.radius, 50.0f, 32, RED);
         }
     }
 
