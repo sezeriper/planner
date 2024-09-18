@@ -37,7 +37,7 @@ public:
     }
 
 private:
-    plane_control& pc;
+    plane_control& _pc;
     cv::VideoCapture _cap;
     cv::VideoWriter _writer;
 
@@ -75,11 +75,11 @@ private:
                 f = frame;
             });
 
-            auto t = unix_to_time(pc.get_unix_epoch_time());
+            auto t = unix_to_time(_pc.get_unix_epoch_time());
 
             auto str = std::to_string(t.hour) + ':' + std::to_string(t.minute) + ':' + std::to_string(t.second) + ':' + std::to_string(t.millisecond);
 
-            cv::putText(frame, str, cv::Point(10, 100), );
+            cv::putText(frame, str, cv::Point(10, 100), cv::FONT_HERSHEY_PLAIN, 8.0, {0.0, 1.0, 0.0});
             _writer.write(frame);
         }
     }

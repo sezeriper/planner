@@ -29,7 +29,8 @@ static bool run_server() {
     qr_reader reader(vid);
     uav_detector detector(vid, pc);
 
-    std::string server_address{"localhost:50051"}; air_controller service(pt, reader, detector);
+    std::string server_address{"localhost:50051"};
+    air_controller service(pt, reader, detector);
     grpc::ServerBuilder builder;
 
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());

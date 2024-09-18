@@ -107,7 +107,9 @@ private:
                 _locked = false;
                 _lock_end = _plane.get_unix_epoch_time();
                 spdlog::info("Locked for {} seconds.", static_cast<double>(_lock_end - _lock_start) / 1000000.0);
-                if (_callback) _callback(_lock_start, _lock_end);
+                if (_lock_end - _lock_start > 4000000)  {
+                    if (_callback) _callback(_lock_start, _lock_end);
+                }
             }
             return;
         }
