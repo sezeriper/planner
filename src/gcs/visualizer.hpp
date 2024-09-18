@@ -4,6 +4,7 @@
 #include "../dubins/dubins.hpp"
 #include "../math.hpp"
 #include "path_planner.hpp"
+#include "referee_client.hpp"
 
 #include <raylib.h>
 #include <rlgl.h>
